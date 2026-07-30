@@ -1,0 +1,263 @@
+diff -Nru a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.cpp
+--- a/src/ggml-cpu/ggml-cpu.cpp	2026-07-17 15:44:55.000000000 +0200
++++ b/src/ggml-cpu/ggml-cpu.cpp	2026-07-30 17:01:35.627545945 +0200
+@@ -679,6 +679,15 @@
+         return (void *)ggml_backend_cpu_set_threadpool;
+     }
+ 
++    // Exposed for tests/benchmarks that exercise quantize/dot kernels when
++    // the CPU backend is loaded as a dynamic plugin (GGML_BACKEND_DL).
++    if (strcmp(name, "ggml_get_type_traits_cpu") == 0) {
++        return (void *)ggml_get_type_traits_cpu;
++    }
++    if (strcmp(name, "ggml_cpu_init") == 0) {
++        return (void *)ggml_cpu_init;
++    }
++
+     return NULL;
+ 
+     GGML_UNUSED(reg);
+diff -Nru a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+--- a/tests/CMakeLists.txt	2026-07-17 15:44:55.000000000 +0200
++++ b/tests/CMakeLists.txt	2026-07-30 17:01:35.628692500 +0200
+@@ -168,6 +168,22 @@
+ add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+ set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+ 
++#
++# test-quantize-fns / test-quantize-perf
++# These call ggml_get_type_traits_cpu / ggml_cpu_init. With GGML_BACKEND_DL that
++# API is resolved at runtime from the best CPU plugin (see test sources).
++
++set(TEST_TARGET test-quantize-fns)
++add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
++target_link_libraries(${TEST_TARGET} PRIVATE ggml)
++add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
++set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
++
++set(TEST_TARGET test-quantize-perf)
++add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
++target_link_libraries(${TEST_TARGET} PRIVATE ggml)
++add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
++set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+ 
+ if (NOT GGML_BACKEND_DL)
+     #
+@@ -176,24 +192,6 @@
+     add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
+     target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+     add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+-    set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+-
+-    #
+-    # test-quantize-fns
+-
+-    set(TEST_TARGET test-quantize-fns)
+-    add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
+-    target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+-    add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+-    set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+-
+-    #
+-    # test-quantize-perf
+-
+-    set(TEST_TARGET test-quantize-perf)
+-    add_executable(${TEST_TARGET} ${TEST_TARGET}.cpp)
+-    target_link_libraries(${TEST_TARGET} PRIVATE ggml)
+-    add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+     set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+ 
+     #
+diff -Nru a/tests/test-quantize-fns.cpp b/tests/test-quantize-fns.cpp
+--- a/tests/test-quantize-fns.cpp	2026-07-17 15:44:55.000000000 +0200
++++ b/tests/test-quantize-fns.cpp	2026-07-30 17:01:35.628464887 +0200
+@@ -2,6 +2,7 @@
+ 
+ #include "ggml.h"
+ #include "ggml-cpu.h"
++#include "ggml-backend.h"
+ 
+ #undef NDEBUG
+ #include <assert.h>
+@@ -14,6 +15,39 @@
+ #pragma warning(disable: 4244 4267) // possible loss of data
+ #endif
+ 
++
++// With GGML_BACKEND_DL the CPU quantize API lives in the best libggml-cpu-*.so
++// plugin (loaded RTLD_LOCAL). Resolve it via the backend registry instead of
++// linking the symbols directly.
++using ggml_get_type_traits_cpu_t = const struct ggml_type_traits_cpu * (*)(enum ggml_type);
++using ggml_cpu_init_t = void (*)(void);
++
++static ggml_get_type_traits_cpu_t g_ggml_get_type_traits_cpu = nullptr;
++static ggml_cpu_init_t            g_ggml_cpu_init            = nullptr;
++
++static bool load_cpu_quantize_api(void) {
++#ifdef GGML_BACKEND_DL
++    ggml_backend_load_all();
++    ggml_backend_reg_t reg = ggml_backend_reg_by_name("CPU");
++    if (!reg) {
++        fprintf(stderr, "error: CPU backend not available (GGML_BACKEND_DL)\n");
++        return false;
++    }
++    g_ggml_get_type_traits_cpu = (ggml_get_type_traits_cpu_t)
++        ggml_backend_reg_get_proc_address(reg, "ggml_get_type_traits_cpu");
++    g_ggml_cpu_init = (ggml_cpu_init_t)
++        ggml_backend_reg_get_proc_address(reg, "ggml_cpu_init");
++    if (!g_ggml_get_type_traits_cpu || !g_ggml_cpu_init) {
++        fprintf(stderr, "error: CPU backend does not export quantize API\n");
++        return false;
++    }
++#else
++    g_ggml_get_type_traits_cpu = ::ggml_get_type_traits_cpu;
++    g_ggml_cpu_init = ::ggml_cpu_init;
++#endif
++    return true;
++}
++
+ constexpr float MAX_QUANTIZATION_REFERENCE_ERROR = 0.0001f;
+ constexpr float MAX_QUANTIZATION_TOTAL_ERROR = 0.002f;
+ constexpr float MAX_QUANTIZATION_TOTAL_ERROR_BINARY = 0.025f;
+@@ -89,7 +123,7 @@
+     std::vector<uint8_t> tmp_q1(2*test_size);
+     std::vector<uint8_t> tmp_q2(2*test_size);
+ 
+-    const auto * vdot = ggml_get_type_traits_cpu(qfns_cpu->vec_dot_type);
++    const auto * vdot = g_ggml_get_type_traits_cpu(qfns_cpu->vec_dot_type);
+ 
+     qfns_cpu->from_float(test_data1, tmp_q1.data(), test_size);
+     vdot->from_float(test_data2, tmp_q2.data(), test_size);
+@@ -103,7 +137,7 @@
+ }
+ 
+ static int test_vec_dot_f32(bool verbose) {
+-    const auto * f32 = ggml_get_type_traits_cpu(GGML_TYPE_F32);
++    const auto * f32 = g_ggml_get_type_traits_cpu(GGML_TYPE_F32);
+     int num_failed = 0;
+     for (int n : {1, 2, 3, 5, 7, 8, 15, 16, 17, 31, 33, 63, 67, 127, 129, 193, 255, 1023}) {
+         std::vector<float> a(n);
+@@ -140,7 +174,7 @@
+     for (int i = 0; i < GGML_TYPE_COUNT; i++) {
+         ggml_type type = (ggml_type) i;
+         const auto * qfns = ggml_get_type_traits(type);
+-        const auto * qfns_cpu = ggml_get_type_traits_cpu(type);
++        const auto * qfns_cpu = g_ggml_get_type_traits_cpu(type);
+ 
+         // deprecated - skip
+         if (qfns->blck_size == 0) {
+@@ -201,6 +235,10 @@
+ }
+ 
+ int main(int argc, char * argv[]) {
++    if (!load_cpu_quantize_api()) {
++        return 1;
++    }
++
+     bool verbose = false;
+ 
+     std::string arg;
+@@ -215,7 +253,7 @@
+         }
+     }
+ 
+-    ggml_cpu_init();
++    g_ggml_cpu_init();
+ 
+     int num_failed = 0;
+ 
+diff -Nru a/tests/test-quantize-perf.cpp b/tests/test-quantize-perf.cpp
+--- a/tests/test-quantize-perf.cpp	2026-07-17 15:44:55.000000000 +0200
++++ b/tests/test-quantize-perf.cpp	2026-07-30 17:01:35.628131492 +0200
+@@ -2,6 +2,7 @@
+ 
+ #include "ggml.h"
+ #include "ggml-cpu.h"
++#include "ggml-backend.h"
+ 
+ #undef NDEBUG
+ #include <algorithm>
+@@ -17,6 +18,39 @@
+ #pragma warning(disable: 4244 4267) // possible loss of data
+ #endif
+ 
++
++// With GGML_BACKEND_DL the CPU quantize API lives in the best libggml-cpu-*.so
++// plugin (loaded RTLD_LOCAL). Resolve it via the backend registry instead of
++// linking the symbols directly.
++using ggml_get_type_traits_cpu_t = const struct ggml_type_traits_cpu * (*)(enum ggml_type);
++using ggml_cpu_init_t = void (*)(void);
++
++static ggml_get_type_traits_cpu_t g_ggml_get_type_traits_cpu = nullptr;
++static ggml_cpu_init_t            g_ggml_cpu_init            = nullptr;
++
++static bool load_cpu_quantize_api(void) {
++#ifdef GGML_BACKEND_DL
++    ggml_backend_load_all();
++    ggml_backend_reg_t reg = ggml_backend_reg_by_name("CPU");
++    if (!reg) {
++        fprintf(stderr, "error: CPU backend not available (GGML_BACKEND_DL)\n");
++        return false;
++    }
++    g_ggml_get_type_traits_cpu = (ggml_get_type_traits_cpu_t)
++        ggml_backend_reg_get_proc_address(reg, "ggml_get_type_traits_cpu");
++    g_ggml_cpu_init = (ggml_cpu_init_t)
++        ggml_backend_reg_get_proc_address(reg, "ggml_cpu_init");
++    if (!g_ggml_get_type_traits_cpu || !g_ggml_cpu_init) {
++        fprintf(stderr, "error: CPU backend does not export quantize API\n");
++        return false;
++    }
++#else
++    g_ggml_get_type_traits_cpu = ::ggml_get_type_traits_cpu;
++    g_ggml_cpu_init = ::ggml_cpu_init;
++#endif
++    return true;
++}
++
+ #define MAX_ALIGNMENT 64
+ #define QK 32
+ #define WARMUP 5
+@@ -123,7 +157,7 @@
+     for (int i = 0; i < GGML_TYPE_COUNT; i++) {
+         ggml_type type = (ggml_type) i;
+         const auto * qfns     = ggml_get_type_traits(type);
+-        const auto * qfns_cpu = ggml_get_type_traits_cpu(type);
++        const auto * qfns_cpu = g_ggml_get_type_traits_cpu(type);
+         if (ggml_type_name(type) != NULL) {
+             if (qfns_cpu->from_float && qfns->to_float) {
+                 printf(" %s", ggml_type_name(type));
+@@ -138,6 +172,10 @@
+ }
+ 
+ int main(int argc, char * argv[]) {
++    if (!load_cpu_quantize_api()) {
++        return 1;
++    }
++
+     quantize_perf_params params {};
+ 
+     // read command line
+@@ -260,12 +298,12 @@
+ 
+     int64_t iterations = params.iterations;
+ 
+-    ggml_cpu_init();
++    g_ggml_cpu_init();
+ 
+     for (int i = 0; i < GGML_TYPE_COUNT; i++) {
+         ggml_type type = (ggml_type) i;
+         const auto * qfns = ggml_get_type_traits(type);
+-        const auto * qfns_cpu = ggml_get_type_traits_cpu(type);
++        const auto * qfns_cpu = g_ggml_get_type_traits_cpu(type);
+         if (!params.include_types.empty() && ggml_type_name(type) && std::find(params.include_types.begin(), params.include_types.end(), ggml_type_name(type)) == params.include_types.end()) {
+             continue;
+         }
+@@ -323,7 +361,7 @@
+                 for (size_t size : params.test_sizes) {
+                     printf("    %zu values (%.2f MB)\n", size, 4*size/(float)(1024*1024));
+                     auto quantize_fn = [&](void) -> float {
+-                        const auto * vdot = ggml_get_type_traits_cpu(qfns_cpu->vec_dot_type);
++                        const auto * vdot = g_ggml_get_type_traits_cpu(qfns_cpu->vec_dot_type);
+                         vdot->from_float(test_data1, test_q1, size);
+                         return test_q1[0];
+                     };

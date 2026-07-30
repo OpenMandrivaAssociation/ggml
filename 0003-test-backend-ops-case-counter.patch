@@ -1,0 +1,76 @@
+diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+--- a/tests/test-backend-ops.cpp	2026-07-17 15:44:55.000000000 +0200
++++ b/tests/test-backend-ops.cpp	2026-07-30 23:38:09.567710937 +0200
+@@ -10135,6 +10135,11 @@
+         std::vector<std::string> failed_tests;
+         std::mutex failed_tests_mutex;
+ 
++        const size_t n_cases = test_cases.size();
++        std::atomic<size_t> cases_done = 0;
++        printf("test: %zu cases (parallel_workers=%d)\n", n_cases, parallel_workers);
++        fflush(stdout);
++
+         // Each worker grabs a chunk of cases at a time. The chunk shrinks as we
+         // run out of work so that a few slow tests at the tail get spread across
+         // workers instead of landing on one unlucky thread.
+@@ -10155,6 +10160,14 @@
+             while (my_begin < test_cases.size()) {
+                 for (size_t i = my_begin; i < my_end; ++i) {
+                     auto & test = test_cases[i];
++                    const size_t done = cases_done.fetch_add(1, std::memory_order_relaxed) + 1;
++                    // Progress line before work so a stuck case still shows an index
++                    {
++                        static std::mutex progress_mutex;
++                        std::lock_guard<std::mutex> lock(progress_mutex);
++                        printf("[%zu/%zu]\n", done, n_cases);
++                        fflush(stdout);
++                    }
+                     test_status_t status = test->eval(b, b_cpu, op_names_filter, output_printer);
+                     if (status == test_status_t::SKIPPED || status == test_status_t::NOT_SUPPORTED) {
+                         continue;
+@@ -10225,7 +10238,14 @@
+         );
+ 
+         size_t n_ok = 0;
++        const size_t n_cases = test_cases.size();
++        printf("grad: %zu cases\n", n_cases);
++        fflush(stdout);
++        size_t case_i = 0;
+         for (auto & test : test_cases) {
++            ++case_i;
++            printf("[%zu/%zu]\n", case_i, n_cases);
++            fflush(stdout);
+             if (test->eval_grad(backend, op_names_filter, output_printer)) {
+                 n_ok++;
+             }
+@@ -10236,7 +10256,15 @@
+     }
+ 
+     if (mode == MODE_PERF) {
++        const size_t n_cases = test_cases.size();
++        printf("perf: %zu cases\n", n_cases);
++        fflush(stdout);
++        size_t case_i = 0;
+         for (auto & test : test_cases) {
++            ++case_i;
++            // One line per case so progress survives skip paths that print nothing
++            printf("[%zu/%zu]\n", case_i, n_cases);
++            fflush(stdout);
+             test->eval_perf(backend, op_names_filter, output_printer);
+         }
+         return true;
+@@ -10251,7 +10279,14 @@
+             test_cases.end()
+         );
+ 
++        const size_t n_cases = test_cases.size();
++        printf("support: %zu cases\n", n_cases);
++        fflush(stdout);
++        size_t case_i = 0;
+         for (auto & test : test_cases) {
++            ++case_i;
++            printf("[%zu/%zu]\n", case_i, n_cases);
++            fflush(stdout);
+             test->eval_support(backend, op_names_filter, output_printer);
+         }
+         return true;
