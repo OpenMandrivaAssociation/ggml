@@ -2,10 +2,15 @@
 # Optional accelerators ship as separate backend packages so non-AMD systems
 # do not pull ROCm, and so Vulkan/OpenCL/BLAS can be installed independently.
 
-# ROCm/HIP backend for AMD GPUs. Host CPU can be anything (Zen, Intel, ARM, …);
-# only the offload targets are AMD gfx* ISAs. Opt out with --without rocm if a
-# builder lacks the ROCm stack.
+# ROCm/HIP backend (TheRock 7.14 + gfx* fat binary on OpenMandriva).
+# Only enable where the 7.14 stack is published — currently znver1 only.
+# Plain x86_64 still has stale/broken ROCm packages; aarch64 lacks hipcc.
+# Opt out with --without rocm; force with --with rocm on other arches once ready.
+%ifarch znver1
 %bcond_without rocm
+%else
+%bcond_with rocm
+%endif
 
 %define libname %{mklibname ggml}
 %define devname %{mklibname -d ggml}
@@ -13,7 +18,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.17.0
-Release:		4
+Release:		5
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -39,12 +44,15 @@ BuildRequires:	pkgconfig(OpenCL)
 %if %{with rocm}
 BuildRequires:	rocm-rpm-macros
 BuildRequires:	hipcc
-BuildRequires:	cmake(hip)
-BuildRequires:	cmake(hipblas)
-BuildRequires:	cmake(rocblas)
-BuildRequires:	cmake(hipsolver)
-BuildRequires:	cmake(amd_comgr)
-BuildRequires:	cmake(hsa-runtime64)
+BuildRequires:	rocminfo
+# clang-offload-bundler / amdgcn-link for HIP fat binaries
+BuildRequires:	clang-tools
+BuildRequires:	rocm-hip-devel
+BuildRequires:	rocm-comgr-devel
+BuildRequires:	rocm-runtime-devel
+BuildRequires:	rocblas-devel
+BuildRequires:	hipblas-devel
+BuildRequires:	hipsolver-devel
 BuildRequires:	clang >= %{rocm_llvm_maj_ver}
 %endif
 
