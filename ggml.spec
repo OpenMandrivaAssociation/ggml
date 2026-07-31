@@ -2,15 +2,11 @@
 # Optional accelerators ship as separate backend packages so non-AMD systems
 # do not pull ROCm, and so Vulkan/OpenCL/BLAS can be installed independently.
 
-# ROCm/HIP backend (TheRock 7.14 + gfx* fat binary on OpenMandriva).
-# Only enable where the 7.14 stack is published — currently znver1 only.
-# Plain x86_64 still has stale/broken ROCm packages; aarch64 lacks hipcc.
-# Opt out with --without rocm; force with --with rocm on other arches once ready.
-%ifarch znver1
+# ROCm/HIP backend for AMD GPUs. Host CPU can be anything (Zen, Intel, ARM, …);
+# only the offload targets are AMD gfx* ISAs (see %%{rocm_gpu_targets}).
+# Build HIP on all arches; opt out with --without rocm only if a builder
+# truly lacks the stack.
 %bcond_without rocm
-%else
-%bcond_with rocm
-%endif
 
 %define libname %{mklibname ggml}
 %define devname %{mklibname -d ggml}
@@ -18,7 +14,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.17.0
-Release:		5
+Release:		6
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
