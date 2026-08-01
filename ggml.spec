@@ -279,9 +279,12 @@ fi
 # discovered via the executable directory; libggml*.so live under src/.
 # test-quantize-* work with GGML_BACKEND_DL via 0002 patch.
 %pgo
-_bd=_OMV_rpm_build
+# Absolute paths: long training runs can outlive relative cwd assumptions, and
+# bash reports missing .so as "No such file or directory" for the binary.
+_bd="$PWD/_OMV_rpm_build"
 _bin="$_bd/bin"
-export LD_LIBRARY_PATH="$PWD/$_bd/src:$PWD/$_bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+_src="$_bd/src"
+export LD_LIBRARY_PATH="$_src:$_bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 if [ ! -x "$_bin/test-backend-ops" ] || [ ! -x "$_bin/test-quantize-perf" ]; then
 	echo "PGO: expected test binaries under $_bin — listing:"
@@ -299,11 +302,20 @@ _pgo_run() {
 # Quantize / dequant / vec_dot hot paths on synthetic rows (best CPU plugin)
 _pgo_run "$_bin/test-quantize-perf"
 
-# Op microbenchmarks; -b CPU required (CPU devices are skipped without a filter)
+# Op microbenchmarks; -b CPU required (CPU devices are skipped without a filter).
+# This is the long training step (~day-scale on ABF/builders).
 _pgo_run "$_bin/test-backend-ops" perf -b CPU
 
-# Broader op/branch coverage (correctness suite on CPU)
-_pgo_run "$_bin/test-backend-ops" test -b CPU
+# Broader op/branch coverage (correctness suite on CPU). Non-fatal: after a
+# successful multi-hour perf run we still want the raw profiles even if the
+# binary/libs vanish or the correctness suite fails.
+if [ -x "$_bin/test-backend-ops" ]; then
+	_pgo_run "$_bin/test-backend-ops" test -b CPU \
+		|| echo "PGO: test-backend-ops test failed (profiles from perf still kept)"
+else
+	echo "PGO: test-backend-ops missing after perf; keeping profiles from earlier steps"
+	ls -la "$_bin" "$_src" 2>/dev/null || true
+fi
 
 # Backend plugins land in the backend dir; drop accidental copies of main libs
 %install -a
