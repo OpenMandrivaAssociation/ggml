@@ -14,7 +14,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.17.0
-Release:		2
+Release:		3
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -96,12 +96,13 @@ BuildOption:	-DGGML_CPU_AARCH64:BOOL=OFF
 BuildOption:	-DGGML_OPENCL_USE_ADRENO_KERNELS:BOOL=OFF
 %endif
 %if %{with rocm}
-# Prefer modern HIP language (clang++ host + hipcc as HIP compiler).
-# Using CXX=hipcc is legacy and breaks aarch64 multi-ISA CPU variants:
-# hipcc does not honour -march=…+sve for host objects, so vec.h SVE paths
-# fail with "SVE vector type … cannot be used in a target without sve".
+# Modern HIP: host CXX and HIP language both use clang++ (not the hipcc
+# wrapper). CMake rejects CMAKE_HIP_COMPILER=hipcc. Using CXX=hipcc is
+# legacy and also breaks aarch64 multi-ISA CPU plugins (SVE host objects
+# get -march=…+sve but hipcc still errors "target without sve").
+# hipcc remains a BuildRequires for the ROCm driver stack / hipconfig.
 BuildOption:	-DCMAKE_CXX_COMPILER=clang++
-BuildOption:	-DCMAKE_HIP_COMPILER=hipcc
+BuildOption:	-DCMAKE_HIP_COMPILER=clang++
 BuildOption:	-DGGML_HIP:BOOL=ON
 BuildOption:	-DGGML_HIP_GRAPHS:BOOL=OFF
 BuildOption:	-DGGML_HIP_RCCL:BOOL=OFF
@@ -109,6 +110,8 @@ BuildOption:	-DGGML_HIP_RCCL:BOOL=OFF
 BuildOption:	-DGPU_TARGETS="%{rocm_gpu_targets}"
 BuildOption:	-DAMDGPU_TARGETS="%{rocm_gpu_targets}"
 BuildOption:	-DCMAKE_HIP_ARCHITECTURES="%{rocm_gpu_targets}"
+# Ensure device bitcode is found during enable_language(HIP) try-compile
+BuildOption:	-DCMAKE_HIP_FLAGS="--rocm-path=%{_prefix} --rocm-device-lib-path=%{_libdir}/amdgcn/bitcode"
 BuildOption:	-DCMAKE_PREFIX_PATH=%{_prefix}
 %else
 BuildOption:	-DCMAKE_CXX_COMPILER=clang++
