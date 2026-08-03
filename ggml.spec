@@ -14,7 +14,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.17.0
-Release:		1
+Release:		2
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -96,13 +96,19 @@ BuildOption:	-DGGML_CPU_AARCH64:BOOL=OFF
 BuildOption:	-DGGML_OPENCL_USE_ADRENO_KERNELS:BOOL=OFF
 %endif
 %if %{with rocm}
-BuildOption:	-DCMAKE_CXX_COMPILER=hipcc
+# Prefer modern HIP language (clang++ host + hipcc as HIP compiler).
+# Using CXX=hipcc is legacy and breaks aarch64 multi-ISA CPU variants:
+# hipcc does not honour -march=…+sve for host objects, so vec.h SVE paths
+# fail with "SVE vector type … cannot be used in a target without sve".
+BuildOption:	-DCMAKE_CXX_COMPILER=clang++
+BuildOption:	-DCMAKE_HIP_COMPILER=hipcc
 BuildOption:	-DGGML_HIP:BOOL=ON
 BuildOption:	-DGGML_HIP_GRAPHS:BOOL=OFF
 BuildOption:	-DGGML_HIP_RCCL:BOOL=OFF
 # Quote targets: ';' must not split the conf-script for-loop / shell words
 BuildOption:	-DGPU_TARGETS="%{rocm_gpu_targets}"
 BuildOption:	-DAMDGPU_TARGETS="%{rocm_gpu_targets}"
+BuildOption:	-DCMAKE_HIP_ARCHITECTURES="%{rocm_gpu_targets}"
 BuildOption:	-DCMAKE_PREFIX_PATH=%{_prefix}
 %else
 BuildOption:	-DCMAKE_CXX_COMPILER=clang++
@@ -240,14 +246,9 @@ if printf '%s' "$_cflags" | grep -q 'fprofile-'; then
 fi
 export CFLAGS="$_cflags"
 export LDFLAGS="$_ldflags"
-%if %{with rocm}
-export CXX=hipcc
-# Prefix each -fprofile-* token with -Xarch_host for device-safe HIP builds
-export CXXFLAGS=$(printf '%s' "$_cflags" | sed -E 's/(^| )(-fprofile-[^ ]+)/ \-Xarch_host \2/g')
-%else
+# Host C++ is always clang++ (HIP device code uses CMAKE_HIP_COMPILER=hipcc).
 export CXX=clang++
 export CXXFLAGS="$_cflags"
-%endif
 
 # Nested ExternalProject (vulkan-shaders-gen) configures a *new* CMake at
 # %build time and inherits process-environment CFLAGS/LDFLAGS — not the
