@@ -14,7 +14,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.17.0
-Release:		3
+Release:		4
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -282,6 +282,12 @@ fi
 # Plugins land next to the test binary under _OMV_rpm_build/bin and are
 # discovered via the executable directory; libggml*.so live under src/.
 # test-quantize-* work with GGML_BACKEND_DL via 0002 patch.
+#
+# mock rpmbuild_timeout is 40h for the *whole* build (two compiles + training).
+# ABF 648966 (aarch64) was SIGKILL'd at 144308s during test-backend-ops perf:
+# LIGHTNING_INDEXER(kv=65536,nb=2048) is ~50 min/case at ~3 GFLOPS on Altra,
+# plus an equal-cost warmup — ~31h for that op alone. znver1/x86_64 only just
+# finished the full suite (~37.6h). There is no --exclude; -o is include-only.
 %pgo
 # Absolute paths: long training runs can outlive relative cwd assumptions, and
 # bash reports missing .so as "No such file or directory" for the binary.
@@ -296,23 +302,57 @@ if [ ! -x "$_bin/test-backend-ops" ] || [ ! -x "$_bin/test-quantize-perf" ]; the
 	exit 1
 fi
 
+# 20h budget inside %%pgo leaves room for pass-2 rebuild before the 40h kill.
+# date(1) rather than $SECONDS: rpm scriptlets are /bin/sh -e (not always bash).
+_pgo_start=$(date +%s)
+_pgo_budget=$((20 * 3600))
+
 # Drop compiler-rt VP spam from training logs (still fixable at compile time
 # via -vp-counters-per-site in %%conf; this is belt-and-suspenders for ABF logs).
+# timeout is best-effort: SIGTERM mid-run may not dump that process's raw
+# profiles, so keep LIGHTNING_INDEXER out rather than relying on the cap.
 _pgo_run() {
-	# line-buffered filter so long runs still stream useful output
-	"$@" 2> >(grep -v --line-buffered 'LLVM Profile Warning' >&2)
+	_left=$((_pgo_start + _pgo_budget - $(date +%s)))
+	if [ "$_left" -le 30 ]; then
+		echo "PGO: time budget exhausted, skipping: $*"
+		return 0
+	fi
+	echo "PGO: [$((_left / 60)) min left] $*"
+	_rc=0
+	if command -v timeout >/dev/null 2>&1; then
+		timeout --kill-after=30 "$_left" "$@" \
+			2> >(grep -v --line-buffered 'LLVM Profile Warning' >&2) || _rc=$?
+	else
+		"$@" 2> >(grep -v --line-buffered 'LLVM Profile Warning' >&2) || _rc=$?
+	fi
+	if [ "$_rc" -eq 124 ] || [ "$_rc" -eq 137 ]; then
+		echo "PGO: timed out, keeping profiles from earlier steps: $*"
+		return 0
+	fi
+	return "$_rc"
 }
 
 # Quantize / dequant / vec_dot hot paths on synthetic rows (best CPU plugin)
 _pgo_run "$_bin/test-quantize-perf"
 
 # Op microbenchmarks; -b CPU required (CPU devices are skipped without a filter).
-# This is the long training step (~day-scale on ABF/builders).
-_pgo_run "$_bin/test-backend-ops" perf -b CPU
+# Same make_test_cases_perf() ops as upstream, minus LIGHTNING_INDEXER.
+_pgo_ops='ADD,ADD_ID,ACC,ARGMAX,ARGSORT,COL2IM_1D,CONV_2D,CONV_2D_DW,CONV_3D'
+_pgo_ops="$_pgo_ops,CONV_TRANSPOSE_2D,CPY,CUMSUM,FLASH_ATTN_EXT,GATED_DELTA_NET"
+_pgo_ops="$_pgo_ops,IM2COL,MEAN,MUL_MAT,MUL_MAT_HADAMARD,MUL_MAT_ID,MUL_MAT_ID_FUSION"
+_pgo_ops="$_pgo_ops,PAD_REFLECT_1D,ROPE,ROPE_BACK,SNAKE_FUSE,SOFT_MAX,SOLVE_TRI"
+_pgo_ops="$_pgo_ops,SSM_CONV,SSM_CONV_BIAS_SILU,SSM_SCAN,SUM,SUM_ROWS,TOP_K,TRI"
+_pgo_run "$_bin/test-backend-ops" perf -b CPU -o "$_pgo_ops"
+
+# Cheap DeepSeek indexer shapes only (kv=256). Full kv=65536 is the timeout.
+# Non-fatal: optional extra coverage, not the hot path.
+_pgo_run "$_bin/test-backend-ops" perf -b CPU -o LIGHTNING_INDEXER -p 'kv=256' \
+	|| echo "PGO: LIGHTNING_INDEXER kv=256 perf failed (continuing)"
 
 # Broader op/branch coverage (correctness suite on CPU). Non-fatal: after a
 # successful multi-hour perf run we still want the raw profiles even if the
-# binary/libs vanish or the correctness suite fails.
+# binary/libs vanish or the correctness suite fails. Do not pass -j: each
+# worker is already N_THREADS=nproc, and 160 workers on Altra can OOM.
 if [ -x "$_bin/test-backend-ops" ]; then
 	_pgo_run "$_bin/test-backend-ops" test -b CPU \
 		|| echo "PGO: test-backend-ops test failed (profiles from perf still kept)"
