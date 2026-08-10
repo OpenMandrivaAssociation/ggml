@@ -120,7 +120,7 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 
 # 0001: LLVM 23 amdgcn bf16 WMMA/MFMA builtins take short vectors, not __bf16
 # 0002: test-quantize-{perf,fns} with GGML_BACKEND_DL via get_proc_address
-# 0003: [i/N] progress for test-backend-ops (long PGO training runs)
+# 0003: [i/N] progress; apply -o before counting so N is cases that run
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
 0001-llvm23-bf16-wmma-short-vectors.patch

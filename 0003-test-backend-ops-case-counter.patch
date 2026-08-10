@@ -1,7 +1,54 @@
 diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
 --- a/tests/test-backend-ops.cpp	2026-07-17 15:44:55.000000000 +0200
-+++ b/tests/test-backend-ops.cpp	2026-07-30 23:38:09.567710937 +0200
-@@ -10135,6 +10135,11 @@
++++ b/tests/test-backend-ops.cpp	2026-08-10 17:34:00.000000000 +0200
+@@ -10095,6 +10095,38 @@
+         }
+     };
+ 
++    // -o is otherwise applied only inside eval/eval_perf, so [i/N] counted
++    // skipped LIGHTNING_INDEXER cases too (N=1113). Drop them first.
++    auto filter_test_cases_by_op = [](std::vector<std::unique_ptr<test_case>> & test_cases, const char * op_names_filter) {
++        if (op_names_filter == nullptr) {
++            return;
++        }
++
++        ggml_init_params params = {
++            /* .mem_size = */ ggml_tensor_overhead()*128 + ggml_graph_overhead(),
++            /* .mem_base = */ NULL,
++            /* .no_alloc = */ true,
++        };
++
++        const size_t n_before = test_cases.size();
++        for (auto it = test_cases.begin(); it != test_cases.end();) {
++            ggml_context_ptr ctx(ggml_init(params));
++            if (!ctx) {
++                ++it;
++                continue;
++            }
++            ggml_context_ptr ctx_w((*it)->use_weight_context() ? ggml_init(params) : nullptr);
++            ggml_tensor * out = (*it)->build_graph(ctx.get(), ctx_w.get());
++            if (out && !(*it)->matches_filter(out, op_names_filter)) {
++                it = test_cases.erase(it);
++                continue;
++            }
++            ++it;
++        }
++        printf("filter -o: %zu -> %zu cases\n", n_before, test_cases.size());
++        fflush(stdout);
++    };
++
+     std::vector<std::unique_ptr<test_case>> test_cases;
+ 
+     if (test_file_path == nullptr) {
+@@ -10113,6 +10145,7 @@
+     }
+ 
+     filter_test_cases(test_cases, params_filter);
++    filter_test_cases_by_op(test_cases, op_names_filter);
+ 
+     if (mode == MODE_TEST) {
+         ggml_backend_ptr backend_cpu(ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, NULL));
+@@ -10135,6 +10168,11 @@
          std::vector<std::string> failed_tests;
          std::mutex failed_tests_mutex;
  
@@ -13,7 +60,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
          // Each worker grabs a chunk of cases at a time. The chunk shrinks as we
          // run out of work so that a few slow tests at the tail get spread across
          // workers instead of landing on one unlucky thread.
-@@ -10155,6 +10160,14 @@
+@@ -10155,6 +10193,14 @@
              while (my_begin < test_cases.size()) {
                  for (size_t i = my_begin; i < my_end; ++i) {
                      auto & test = test_cases[i];
@@ -28,7 +75,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
                      test_status_t status = test->eval(b, b_cpu, op_names_filter, output_printer);
                      if (status == test_status_t::SKIPPED || status == test_status_t::NOT_SUPPORTED) {
                          continue;
-@@ -10225,7 +10238,14 @@
+@@ -10225,7 +10271,14 @@
          );
  
          size_t n_ok = 0;
@@ -43,7 +90,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
              if (test->eval_grad(backend, op_names_filter, output_printer)) {
                  n_ok++;
              }
-@@ -10236,7 +10256,15 @@
+@@ -10236,7 +10289,15 @@
      }
  
      if (mode == MODE_PERF) {
@@ -59,7 +106,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
              test->eval_perf(backend, op_names_filter, output_printer);
          }
          return true;
-@@ -10251,7 +10279,14 @@
+@@ -10251,7 +10312,14 @@
              test_cases.end()
          );
  
