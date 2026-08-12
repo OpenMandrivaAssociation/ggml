@@ -14,7 +14,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.19.0
-Release:		1
+Release:		2
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -121,11 +121,15 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 # 0001: LLVM 23 amdgcn bf16 WMMA/MFMA builtins take short vectors, not __bf16
 # 0002: test-quantize-{perf,fns} with GGML_BACKEND_DL via get_proc_address
 # 0003: [i/N] progress; apply -o before counting so N is cases that run
+# 0004: GGML_MAX_NAME 160 (sd.cpp Flux/SDXL tensor names) + ComfyUI
+#      int8_tensorwise/convrot ops. CPU + Vulkan native; HIP uses
+#      hipblasGemmEx I8→I32 with a naive kernel fallback (Vega etc.).
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
 0001-llvm23-bf16-wmma-short-vectors.patch
 0002-backend-dl-quantize-tests.patch
 0003-test-backend-ops-case-counter.patch
+0004-max-name-160-and-i8-convrot.patch
 
 %description
 ggml is a tensor library for machine learning with integer quantization
@@ -136,8 +140,13 @@ and multi-ISA CPU backends. Optional accelerators are separate packages:
 * %{name}-backend-opencl — OpenCL
 * %{name}-backend-hip — AMD ROCm/HIP (any host CPU with an AMD GPU)
 
-Used system-wide by llama-cpp, whisper-cpp and other consumers via
-find_package(ggml) / WHISPER_USE_SYSTEM_GGML / LLAMA_USE_SYSTEM_GGML.
+Used system-wide by llama-cpp, whisper-cpp, stable-diffusion.cpp
+and other consumers via find_package(ggml) / *_USE_SYSTEM_GGML.
+
+Tensor names are 160 bytes (GGML_MAX_NAME) so Flux/SDXL graphs fit.
+ComfyUI int8_tensorwise/convrot models use extra I8 kernels on CPU,
+Vulkan (integerDotProduct) and HIP (hipBLAS I8 GEMM or a portable
+fallback). Llama/whisper never emit those ops.
 
 Runtime library: %{libname}. Development files: %{devname}.
 
