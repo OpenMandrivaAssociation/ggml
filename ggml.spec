@@ -124,6 +124,8 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 # 0004: GGML_MAX_NAME 160 (sd.cpp Flux/SDXL tensor names) + ComfyUI
 #      int8_tensorwise/convrot ops. CPU + Vulkan native; HIP uses
 #      hipblasGemmEx I8→I32 with a naive kernel fallback (Vega etc.).
+#      Must not revert 0002's get_proc_address quantize exports
+#      (ABF 649598–600 %pgo: "CPU backend does not export quantize API").
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
 0001-llvm23-bf16-wmma-short-vectors.patch

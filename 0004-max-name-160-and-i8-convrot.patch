@@ -360,22 +360,6 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.c
          case GGML_OP_SOFT_MAX_BACK: {
              if (op->src[0]->type != GGML_TYPE_F32 || op->src[1]->type != GGML_TYPE_F32) {
                  return false;
-@@ -681,15 +724,6 @@
-         return (void *)ggml_backend_cpu_set_threadpool;
-     }
- 
--    // Exposed for tests/benchmarks that exercise quantize/dot kernels when
--    // the CPU backend is loaded as a dynamic plugin (GGML_BACKEND_DL).
--    if (strcmp(name, "ggml_get_type_traits_cpu") == 0) {
--        return (void *)ggml_get_type_traits_cpu;
--    }
--    if (strcmp(name, "ggml_cpu_init") == 0) {
--        return (void *)ggml_cpu_init;
--    }
--
-     return NULL;
- 
-     GGML_UNUSED(reg);
 diff -ruN --no-dereference a/src/ggml-cpu/ops.cpp b/src/ggml-cpu/ops.cpp
 --- a/src/ggml-cpu/ops.cpp	2026-08-07 16:10:01.000000000 +0200
 +++ b/src/ggml-cpu/ops.cpp	2026-08-12 16:46:56.810340662 +0200
