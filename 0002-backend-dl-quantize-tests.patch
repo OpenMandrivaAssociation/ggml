@@ -1,7 +1,7 @@
-diff -Nru a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.cpp
---- a/src/ggml-cpu/ggml-cpu.cpp	2026-08-07 16:10:01.000000000 +0200
-+++ b/src/ggml-cpu/ggml-cpu.cpp	2026-08-11 15:13:55.132067346 +0200
-@@ -681,6 +681,15 @@
+diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.cpp
+--- a/src/ggml-cpu/ggml-cpu.cpp	2026-08-14 17:13:36.000000000 +0200
++++ b/src/ggml-cpu/ggml-cpu.cpp	2026-08-15 23:48:04.619943997 +0200
+@@ -684,6 +684,15 @@
          return (void *)ggml_backend_cpu_set_threadpool;
      }
  
@@ -17,9 +17,9 @@ diff -Nru a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.cpp
      return NULL;
  
      GGML_UNUSED(reg);
-diff -Nru a/tests/CMakeLists.txt b/tests/CMakeLists.txt
---- a/tests/CMakeLists.txt	2026-08-07 16:10:01.000000000 +0200
-+++ b/tests/CMakeLists.txt	2026-08-11 15:13:55.132245608 +0200
+diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+--- a/tests/CMakeLists.txt	2026-08-14 17:13:36.000000000 +0200
++++ b/tests/CMakeLists.txt	2026-08-15 23:48:04.620013338 +0200
 @@ -168,6 +168,22 @@
  add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
  set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
@@ -68,9 +68,9 @@ diff -Nru a/tests/CMakeLists.txt b/tests/CMakeLists.txt
      set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
  
      #
-diff -Nru a/tests/test-quantize-fns.cpp b/tests/test-quantize-fns.cpp
---- a/tests/test-quantize-fns.cpp	2026-08-07 16:10:01.000000000 +0200
-+++ b/tests/test-quantize-fns.cpp	2026-08-11 15:13:55.132422681 +0200
+diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-fns.cpp
+--- a/tests/test-quantize-fns.cpp	2026-08-14 17:13:36.000000000 +0200
++++ b/tests/test-quantize-fns.cpp	2026-08-15 23:48:04.620072879 +0200
 @@ -2,6 +2,7 @@
  
  #include "ggml.h"
@@ -166,9 +166,9 @@ diff -Nru a/tests/test-quantize-fns.cpp b/tests/test-quantize-fns.cpp
  
      int num_failed = 0;
  
-diff -Nru a/tests/test-quantize-perf.cpp b/tests/test-quantize-perf.cpp
---- a/tests/test-quantize-perf.cpp	2026-08-07 16:10:01.000000000 +0200
-+++ b/tests/test-quantize-perf.cpp	2026-08-11 15:13:55.132581853 +0200
+diff -ruN --no-dereference a/tests/test-quantize-perf.cpp b/tests/test-quantize-perf.cpp
+--- a/tests/test-quantize-perf.cpp	2026-08-14 17:13:36.000000000 +0200
++++ b/tests/test-quantize-perf.cpp	2026-08-15 23:48:04.620127689 +0200
 @@ -2,6 +2,7 @@
  
  #include "ggml.h"

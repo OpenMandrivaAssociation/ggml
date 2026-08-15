@@ -1,7 +1,7 @@
-diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
---- a/tests/test-backend-ops.cpp	2026-08-07 16:10:01.000000000 +0200
-+++ b/tests/test-backend-ops.cpp	2026-08-11 15:13:55.138217142 +0200
-@@ -10184,6 +10184,38 @@
+diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+--- a/tests/test-backend-ops.cpp	2026-08-14 17:13:36.000000000 +0200
++++ b/tests/test-backend-ops.cpp	2026-08-15 23:48:04.674422584 +0200
+@@ -10470,6 +10470,38 @@
          }
      };
  
@@ -40,7 +40,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
      std::vector<std::unique_ptr<test_case>> test_cases;
  
      if (test_file_path == nullptr) {
-@@ -10202,6 +10234,7 @@
+@@ -10488,6 +10520,7 @@
      }
  
      filter_test_cases(test_cases, params_filter);
@@ -48,7 +48,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
  
      if (mode == MODE_TEST) {
          ggml_backend_ptr backend_cpu(ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, NULL));
-@@ -10224,6 +10257,11 @@
+@@ -10510,6 +10543,11 @@
          std::vector<std::string> failed_tests;
          std::mutex failed_tests_mutex;
  
@@ -60,7 +60,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
          // Each worker grabs a chunk of cases at a time. The chunk shrinks as we
          // run out of work so that a few slow tests at the tail get spread across
          // workers instead of landing on one unlucky thread.
-@@ -10244,6 +10282,14 @@
+@@ -10530,6 +10568,14 @@
              while (my_begin < test_cases.size()) {
                  for (size_t i = my_begin; i < my_end; ++i) {
                      auto & test = test_cases[i];
@@ -75,7 +75,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
                      test_status_t status = test->eval(b, b_cpu, op_names_filter, output_printer);
                      if (status == test_status_t::SKIPPED || status == test_status_t::NOT_SUPPORTED) {
                          continue;
-@@ -10314,7 +10360,14 @@
+@@ -10600,7 +10646,14 @@
          );
  
          size_t n_ok = 0;
@@ -90,7 +90,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
              if (test->eval_grad(backend, op_names_filter, output_printer)) {
                  n_ok++;
              }
-@@ -10325,7 +10378,15 @@
+@@ -10611,7 +10664,15 @@
      }
  
      if (mode == MODE_PERF) {
@@ -106,7 +106,7 @@ diff -Nru a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
              test->eval_perf(backend, op_names_filter, output_printer);
          }
          return true;
-@@ -10340,7 +10401,14 @@
+@@ -10626,7 +10687,14 @@
              test_cases.end()
          );
  

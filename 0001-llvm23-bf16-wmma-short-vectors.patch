@@ -1,5 +1,6 @@
---- a/src/ggml-cuda/mma.cuh	2026-07-25 15:44:37.784908441 +0200
-+++ b/src/ggml-cuda/mma.cuh	2026-07-25 15:44:37.800896453 +0200
+diff -ruN --no-dereference a/src/ggml-cuda/mma.cuh b/src/ggml-cuda/mma.cuh
+--- a/src/ggml-cuda/mma.cuh	2026-08-14 17:13:36.000000000 +0200
++++ b/src/ggml-cuda/mma.cuh	2026-08-15 23:48:04.564802357 +0200
 @@ -1259,14 +1259,15 @@
              tile<16, 16, float, dl_d> & D, const tile<16, 8, nv_bfloat162, dl_ab> & A, const tile<16, 8, nv_bfloat162, dl_ab> & B) {
  #if defined(AMD_WMMA_AVAILABLE)
