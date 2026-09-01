@@ -76,7 +76,7 @@ diff -ruN --no-dereference a/include/ggml.h b/include/ggml.h
 diff -ruN --no-dereference a/src/ggml-backend-meta.cpp b/src/ggml-backend-meta.cpp
 --- a/src/ggml-backend-meta.cpp
 +++ b/src/ggml-backend-meta.cpp
-@@ -1009,6 +1009,10 @@
+@@ -1058,6 +1058,10 @@
              case GGML_OP_GLU: {
                  split_state = handle_generic(src_ss, /*scalar_only =*/ false);
              } break;
@@ -363,7 +363,7 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.c
 diff -ruN --no-dereference a/src/ggml-cpu/ops.cpp b/src/ggml-cpu/ops.cpp
 --- a/src/ggml-cpu/ops.cpp
 +++ b/src/ggml-cpu/ops.cpp
-@@ -12023,3 +12023,145 @@
+@@ -12019,3 +12019,145 @@
          }
      }
  }
@@ -617,7 +617,7 @@ diff -ruN --no-dereference a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cud
  #include "ggml-cuda/getrows.cuh"
  #include "ggml-cuda/im2col.cuh"
  #include "ggml-cuda/mmf.cuh"
-@@ -1813,6 +1814,11 @@
+@@ -1814,6 +1815,11 @@
  }
  
  static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
@@ -629,7 +629,7 @@ diff -ruN --no-dereference a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cud
      GGML_TENSOR_BINARY_OP_LOCALS
  
      const int32_t hint = ggml_get_op_params_i32(dst, 1);
-@@ -2248,6 +2254,12 @@
+@@ -2249,6 +2255,12 @@
          case GGML_OP_MUL_MAT:
              ggml_cuda_mul_mat(ctx, dst->src[0], dst->src[1], dst);
              break;
@@ -642,7 +642,7 @@ diff -ruN --no-dereference a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cud
          case GGML_OP_MUL_MAT_ID:
              ggml_cuda_mul_mat_id(ctx, dst);
              break;
-@@ -4918,11 +4930,18 @@
+@@ -4922,11 +4934,18 @@
                      return false;
              }
              break;
@@ -1160,7 +1160,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
  
      vk_pipeline pipeline_dequant[GGML_TYPE_COUNT];
      vk_pipeline pipeline_dequant_transpose[GGML_TYPE_COUNT]; // fused dequant+transpose for FA quant-KV
-@@ -2006,6 +2009,19 @@
+@@ -2007,6 +2010,19 @@
      uint32_t num_blocks;
  };
  
@@ -1180,7 +1180,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
  struct vk_op_flash_attn_split_k_reduce_push_constants {
      uint32_t D;
      uint32_t ne1;
-@@ -5484,6 +5500,18 @@
+@@ -5485,6 +5501,18 @@
          ggml_vk_create_pipeline(device, device->pipeline_quantize_q8_1_x4, "quantize_q8_1_x4", quantize_q8_1_x4_len, quantize_q8_1_x4_data, "main", 2, sizeof(vk_quantize_q8_1_push_constants), {32 * device->subgroup_size / 8, 1, 1}, { device->subgroup_size }, 1);
      }
  
@@ -1199,7 +1199,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
      for (uint32_t i = 0; i < p021_max_gqa_ratio; ++i) {
          if (device->subgroup_arithmetic && device->subgroup_require_full_support) {
              ggml_vk_create_pipeline2(device, device->pipeline_mul_mat_vec_p021_f16_f32[i], "mul_mat_vec_p021_f16_f32"+std::to_string(i+1), mul_mat_vec_p021_f16_f32_subgroup_add_len, mul_mat_vec_p021_f16_f32_subgroup_add_data, "main", mul_mat_vec_num_bindings, sizeof(vk_mat_vec_p021_push_constants), {1, 1, 1}, {device->subgroup_size, i + 1}, 1, true, true);
-@@ -10001,6 +10029,155 @@
+@@ -10003,6 +10031,155 @@
      ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { src_buf, dst_buf }, pc, { workgroups_x, 1, 1 });
  }
  
@@ -1355,7 +1355,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
  static void ggml_vk_mul_mat(ggml_backend_vk_context * ctx, vk_context& subctx, const struct ggml_cgraph * cgraph, int node_idx) {
      ggml_tensor * dst = cgraph->nodes[node_idx];
      ggml_tensor * src0 = dst->src[0];
-@@ -15718,8 +15895,16 @@
+@@ -15741,8 +15918,16 @@
          ggml_vk_leaky_relu(ctx, compute_ctx, src0, node);
  
          break;
@@ -1373,7 +1373,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
  
          break;
      case GGML_OP_MUL_MAT_ID:
-@@ -18101,10 +18286,16 @@
+@@ -18124,10 +18309,16 @@
                  default:
                      return false;
              }
@@ -1809,9 +1809,9 @@ diff -ruN --no-dereference a/src/ggml.c b/src/ggml.c
 diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -185,6 +185,16 @@
- add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+@@ -169,6 +169,16 @@
  set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+ 
  
 +#
 +# test-int8-convrot (CPU / optional --vulkan|--cuda)

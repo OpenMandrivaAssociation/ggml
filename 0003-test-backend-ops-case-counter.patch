@@ -1,7 +1,7 @@
 diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
 --- a/tests/test-backend-ops.cpp
 +++ b/tests/test-backend-ops.cpp
-@@ -10592,6 +10592,38 @@
+@@ -10687,6 +10687,38 @@
          }
      };
  
@@ -40,7 +40,7 @@ diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops
      std::vector<std::unique_ptr<test_case>> test_cases;
  
      if (test_file_path == nullptr) {
-@@ -10610,6 +10642,7 @@
+@@ -10705,6 +10737,7 @@
      }
  
      filter_test_cases(test_cases, params_filter);
@@ -48,7 +48,7 @@ diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops
  
      if (mode == MODE_TEST) {
          ggml_backend_ptr backend_cpu(ggml_backend_init_by_type(GGML_BACKEND_DEVICE_TYPE_CPU, NULL));
-@@ -10632,6 +10665,11 @@
+@@ -10727,6 +10760,11 @@
          std::vector<std::string> failed_tests;
          std::mutex failed_tests_mutex;
  
@@ -60,7 +60,7 @@ diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops
          // Each worker grabs a chunk of cases at a time. The chunk shrinks as we
          // run out of work so that a few slow tests at the tail get spread across
          // workers instead of landing on one unlucky thread.
-@@ -10652,6 +10690,14 @@
+@@ -10747,6 +10785,14 @@
              while (my_begin < test_cases.size()) {
                  for (size_t i = my_begin; i < my_end; ++i) {
                      auto & test = test_cases[i];
@@ -75,7 +75,7 @@ diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops
                      test_status_t status = test->eval(b, b_cpu, op_names_filter, output_printer);
                      if (status == test_status_t::SKIPPED || status == test_status_t::NOT_SUPPORTED) {
                          continue;
-@@ -10722,7 +10768,14 @@
+@@ -10819,7 +10865,14 @@
          );
  
          size_t n_ok = 0;
@@ -90,7 +90,7 @@ diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops
              if (test->eval_grad(backend, op_names_filter, output_printer)) {
                  n_ok++;
              }
-@@ -10733,7 +10786,15 @@
+@@ -10830,7 +10883,15 @@
      }
  
      if (mode == MODE_PERF) {
@@ -106,7 +106,7 @@ diff -ruN --no-dereference a/tests/test-backend-ops.cpp b/tests/test-backend-ops
              test->eval_perf(backend, op_names_filter, output_printer);
          }
          return true;
-@@ -10748,7 +10809,14 @@
+@@ -10845,7 +10906,14 @@
              test_cases.end()
          );
  
