@@ -1809,9 +1809,9 @@ diff -ruN --no-dereference a/src/ggml.c b/src/ggml.c
 diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -169,6 +169,16 @@
+@@ -185,6 +185,16 @@
+ add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
  set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
- 
  
 +#
 +# test-int8-convrot (CPU / optional --vulkan|--cuda)
