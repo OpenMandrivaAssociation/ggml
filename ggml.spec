@@ -13,7 +13,7 @@
 
 Summary:		Tensor library for machine learning
 Name:			ggml
-Version:		0.22.0
+Version:		0.23.0
 Release:		1
 License:		MIT
 Group:			System/Libraries
