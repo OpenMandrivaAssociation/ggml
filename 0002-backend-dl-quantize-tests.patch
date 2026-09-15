@@ -1,6 +1,6 @@
 diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.cpp
---- a/src/ggml-cpu/ggml-cpu.cpp	2026-08-14 17:13:36.000000000 +0200
-+++ b/src/ggml-cpu/ggml-cpu.cpp	2026-08-15 23:48:04.619943997 +0200
+--- a/src/ggml-cpu/ggml-cpu.cpp	2026-09-14 15:34:19.000000000 +0200
++++ b/src/ggml-cpu/ggml-cpu.cpp	2026-09-15 02:08:34.566629649 +0200
 @@ -684,6 +684,15 @@
          return (void *)ggml_backend_cpu_set_threadpool;
      }
@@ -18,8 +18,8 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.c
  
      GGML_UNUSED(reg);
 diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
---- a/tests/CMakeLists.txt	2026-08-14 17:13:36.000000000 +0200
-+++ b/tests/CMakeLists.txt	2026-08-15 23:48:04.620013338 +0200
+--- a/tests/CMakeLists.txt	2026-09-14 15:34:19.000000000 +0200
++++ b/tests/CMakeLists.txt	2026-09-15 02:08:34.566708950 +0200
 @@ -168,6 +168,22 @@
  add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
  set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
@@ -69,8 +69,8 @@ diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
  
      #
 diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-fns.cpp
---- a/tests/test-quantize-fns.cpp	2026-08-14 17:13:36.000000000 +0200
-+++ b/tests/test-quantize-fns.cpp	2026-08-15 23:48:04.620072879 +0200
+--- a/tests/test-quantize-fns.cpp	2026-09-14 15:34:19.000000000 +0200
++++ b/tests/test-quantize-fns.cpp	2026-09-15 02:08:34.566775581 +0200
 @@ -2,6 +2,7 @@
  
  #include "ggml.h"
@@ -79,7 +79,7 @@ diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-f
  
  #undef NDEBUG
  #include <assert.h>
-@@ -14,6 +15,39 @@
+@@ -16,6 +17,39 @@
  #pragma warning(disable: 4244 4267) // possible loss of data
  #endif
  
@@ -120,15 +120,15 @@ diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-f
  constexpr float MAX_QUANTIZATION_TOTAL_ERROR = 0.002f;
  constexpr float MAX_QUANTIZATION_TOTAL_ERROR_BINARY = 0.025f;
 @@ -89,7 +123,7 @@
-     std::vector<uint8_t> tmp_q1(2*test_size);
-     std::vector<uint8_t> tmp_q2(2*test_size);
- 
+                                const float * test_data1, const float * test_data2,
+                                const float * test_data3, const float * test_data4,
+                                const int nrc) {
 -    const auto * vdot = ggml_get_type_traits_cpu(qfns_cpu->vec_dot_type);
 +    const auto * vdot = g_ggml_get_type_traits_cpu(qfns_cpu->vec_dot_type);
- 
-     qfns_cpu->from_float(test_data1, tmp_q1.data(), test_size);
-     vdot->from_float(test_data2, tmp_q2.data(), test_size);
-@@ -103,7 +137,7 @@
+     const size_t pad  = 64;
+     const size_t bx   = ggml_row_size(src0_type, test_size) + pad;
+     const size_t by   = ggml_row_size(qfns_cpu->vec_dot_type, test_size) + pad;
+@@ -132,7 +166,7 @@
  }
  
  static int test_vec_dot_f32(bool verbose) {
@@ -137,7 +137,7 @@ diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-f
      int num_failed = 0;
      for (int n : {1, 2, 3, 5, 7, 8, 15, 16, 17, 31, 33, 63, 67, 127, 129, 193, 255, 1023}) {
          std::vector<float> a(n);
-@@ -140,7 +174,7 @@
+@@ -173,7 +207,7 @@
      for (int i = 0; i < GGML_TYPE_COUNT; i++) {
          ggml_type type = (ggml_type) i;
          const auto * qfns = ggml_get_type_traits(type);
@@ -146,7 +146,7 @@ diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-f
  
          // deprecated - skip
          if (qfns->blck_size == 0) {
-@@ -201,6 +235,10 @@
+@@ -244,6 +278,10 @@
  }
  
  int main(int argc, char * argv[]) {
@@ -157,7 +157,7 @@ diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-f
      bool verbose = false;
  
      std::string arg;
-@@ -215,7 +253,7 @@
+@@ -258,7 +296,7 @@
          }
      }
  
@@ -167,8 +167,8 @@ diff -ruN --no-dereference a/tests/test-quantize-fns.cpp b/tests/test-quantize-f
      int num_failed = 0;
  
 diff -ruN --no-dereference a/tests/test-quantize-perf.cpp b/tests/test-quantize-perf.cpp
---- a/tests/test-quantize-perf.cpp	2026-08-14 17:13:36.000000000 +0200
-+++ b/tests/test-quantize-perf.cpp	2026-08-15 23:48:04.620127689 +0200
+--- a/tests/test-quantize-perf.cpp	2026-09-14 15:34:19.000000000 +0200
++++ b/tests/test-quantize-perf.cpp	2026-09-15 02:08:34.566923303 +0200
 @@ -2,6 +2,7 @@
  
  #include "ggml.h"
