@@ -1,9 +1,9 @@
 diff -ruN --no-dereference a/include/ggml-rpc.h b/include/ggml-rpc.h
---- a/include/ggml-rpc.h	2026-09-14 15:34:19.000000000 +0200
-+++ b/include/ggml-rpc.h	2026-09-15 02:19:30.948101670 +0200
+--- a/include/ggml-rpc.h	2026-09-23 19:10:09.000000000 +0200
++++ b/include/ggml-rpc.h	2026-09-24 15:01:26.994639091 +0200
 @@ -8,10 +8,10 @@
  
- #define RPC_PROTO_MAJOR_VERSION    6
+ #define RPC_PROTO_MAJOR_VERSION    7
  #define RPC_PROTO_MINOR_VERSION    0
 -#define RPC_PROTO_PATCH_VERSION    0
 +#define RPC_PROTO_PATCH_VERSION    1
@@ -15,8 +15,8 @@ diff -ruN --no-dereference a/include/ggml-rpc.h b/include/ggml-rpc.h
  
  #define GGML_RPC_MAX_SERVERS       16
 diff -ruN --no-dereference a/include/ggml.h b/include/ggml.h
---- a/include/ggml.h	2026-09-14 15:34:19.000000000 +0200
-+++ b/include/ggml.h	2026-09-15 02:19:30.948232192 +0200
+--- a/include/ggml.h	2026-09-23 19:10:09.000000000 +0200
++++ b/include/ggml.h	2026-09-24 15:01:26.994806344 +0200
 @@ -226,9 +226,12 @@
  #define GGML_MAX_OP_PARAMS      64
  
@@ -74,8 +74,8 @@ diff -ruN --no-dereference a/include/ggml.h b/include/ggml.h
      GGML_API struct ggml_tensor * ggml_mul_mat_id(
              struct ggml_context * ctx,
 diff -ruN --no-dereference a/src/ggml-backend-meta.cpp b/src/ggml-backend-meta.cpp
---- a/src/ggml-backend-meta.cpp	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-backend-meta.cpp	2026-09-15 02:19:30.948391504 +0200
+--- a/src/ggml-backend-meta.cpp	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-backend-meta.cpp	2026-09-24 15:01:26.994988006 +0200
 @@ -1058,6 +1058,10 @@
              case GGML_OP_GLU: {
                  split_state = handle_generic(src_ss, /*scalar_only =*/ false);
@@ -88,8 +88,8 @@ diff -ruN --no-dereference a/src/ggml-backend-meta.cpp b/src/ggml-backend-meta.c
                  GGML_ABORT("ggml op not implemented: %s", ggml_op_name(tensor->op));
                  split_state = {GGML_BACKEND_SPLIT_AXIS_UNKNOWN, {0}, {1}, 1};
 diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.c b/src/ggml-cpu/ggml-cpu.c
---- a/src/ggml-cpu/ggml-cpu.c	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cpu/ggml-cpu.c	2026-09-15 02:19:30.948580306 +0200
+--- a/src/ggml-cpu/ggml-cpu.c	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cpu/ggml-cpu.c	2026-09-24 15:01:26.995200429 +0200
 @@ -1162,6 +1162,151 @@
  
  // ggml_compute_forward_mul_mat
@@ -270,7 +270,7 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.c b/src/ggml-cpu/ggml-cpu.c
      const int32_t hint = ggml_get_op_params_i32(dst, 1);
      if (hint == GGML_HINT_SRC0_IS_HADAMARD && !params->use_ref) {
          ggml_compute_forward_fwht(params, dst);
-@@ -2057,6 +2216,14 @@
+@@ -2065,6 +2224,14 @@
              {
                  ggml_compute_forward_glu(params, tensor);
              } break;
@@ -285,7 +285,7 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.c b/src/ggml-cpu/ggml-cpu.c
          case GGML_OP_GET_REL_POS:
              {
                  ggml_compute_forward_get_rel_pos(params, tensor);
-@@ -2356,6 +2523,8 @@
+@@ -2364,6 +2531,8 @@
          case GGML_OP_MUL_MAT:
          case GGML_OP_MUL_MAT_ID:
          case GGML_OP_OUT_PROD:
@@ -294,7 +294,7 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.c b/src/ggml-cpu/ggml-cpu.c
              {
                  n_tasks = n_threads;
              } break;
-@@ -2878,6 +3047,11 @@
+@@ -2886,6 +3055,11 @@
                      } break;
                  case GGML_OP_MUL_MAT:
                      {
@@ -307,9 +307,9 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.c b/src/ggml-cpu/ggml-cpu.c
  
                          if (node->src[1]->type != vec_dot_type) {
 diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.cpp
---- a/src/ggml-cpu/ggml-cpu.cpp	2026-09-15 02:19:16.624133900 +0200
-+++ b/src/ggml-cpu/ggml-cpu.cpp	2026-09-15 02:19:30.948727758 +0200
-@@ -451,7 +451,50 @@
+--- a/src/ggml-cpu/ggml-cpu.cpp	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cpu/ggml-cpu.cpp	2026-09-24 15:03:01.302669778 +0200
+@@ -451,11 +451,54 @@
                  op->type != GGML_TYPE_IQ1_S   &&
                  op->type != GGML_TYPE_IQ1_M; // missing type_traits.from_float
          case GGML_OP_MUL_MAT:
@@ -338,6 +338,10 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.c
 +                       (convrot_group_size == 0 ||
 +                        (convrot_group_size <= 256 && src0->ne[0] % convrot_group_size == 0));
 +            }
+             if (ggml_get_op_params_i32(op, 1) == GGML_HINT_SRC0_IS_HADAMARD &&
+                 src0->type == GGML_TYPE_F32 && op->type == GGML_TYPE_F32) {
+                 return src1->type == GGML_TYPE_F32 || src1->type == GGML_TYPE_F16;
+             }
              return src1->type == GGML_TYPE_F32 || src1->type == ggml_get_type_traits_cpu(src0->type)->vec_dot_type;
 +        case GGML_OP_QUANTIZE_I8_CONVROT: {
 +            const int group_size = ggml_get_op_params_i32(op, 0);
@@ -361,9 +365,9 @@ diff -ruN --no-dereference a/src/ggml-cpu/ggml-cpu.cpp b/src/ggml-cpu/ggml-cpu.c
              if (op->src[0]->type != GGML_TYPE_F32 || op->src[1]->type != GGML_TYPE_F32) {
                  return false;
 diff -ruN --no-dereference a/src/ggml-cpu/ops.cpp b/src/ggml-cpu/ops.cpp
---- a/src/ggml-cpu/ops.cpp	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cpu/ops.cpp	2026-09-15 02:19:30.949228134 +0200
-@@ -12162,3 +12162,145 @@
+--- a/src/ggml-cpu/ops.cpp	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cpu/ops.cpp	2026-09-24 15:01:26.996115131 +0200
+@@ -12204,3 +12204,145 @@
          }
      }
  }
@@ -510,8 +514,8 @@ diff -ruN --no-dereference a/src/ggml-cpu/ops.cpp b/src/ggml-cpu/ops.cpp
 +    }
 +}
 diff -ruN --no-dereference a/src/ggml-cpu/ops.h b/src/ggml-cpu/ops.h
---- a/src/ggml-cpu/ops.h	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cpu/ops.h	2026-09-15 02:19:30.949523417 +0200
+--- a/src/ggml-cpu/ops.h	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cpu/ops.h	2026-09-24 15:01:26.996305694 +0200
 @@ -118,6 +118,8 @@
  void ggml_compute_forward_mul_mat(const struct ggml_compute_params * params, struct ggml_tensor * dst);
  void ggml_compute_forward_fwht(const struct ggml_compute_params * params, struct ggml_tensor * dst);
@@ -522,8 +526,8 @@ diff -ruN --no-dereference a/src/ggml-cpu/ops.h b/src/ggml-cpu/ops.h
  }
  #endif
 diff -ruN --no-dereference a/src/ggml-cuda/fwht.cu b/src/ggml-cuda/fwht.cu
---- a/src/ggml-cuda/fwht.cu	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cuda/fwht.cu	2026-09-15 02:19:30.949564298 +0200
+--- a/src/ggml-cuda/fwht.cu	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cuda/fwht.cu	2026-09-24 15:01:26.996351685 +0200
 @@ -99,3 +99,73 @@
              return false;
      }
@@ -599,16 +603,16 @@ diff -ruN --no-dereference a/src/ggml-cuda/fwht.cu b/src/ggml-cuda/fwht.cu
 +    }
 +}
 diff -ruN --no-dereference a/src/ggml-cuda/fwht.cuh b/src/ggml-cuda/fwht.cuh
---- a/src/ggml-cuda/fwht.cuh	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cuda/fwht.cuh	2026-09-15 02:19:30.949590948 +0200
+--- a/src/ggml-cuda/fwht.cuh	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cuda/fwht.cuh	2026-09-24 15:01:26.996379175 +0200
 @@ -2,3 +2,4 @@
  
  // Returns whether the Fast Walsh-Hadamard transform could be used.
  bool ggml_cuda_op_fwht(ggml_backend_cuda_context & ctx, const ggml_tensor * src, ggml_tensor * dst);
 +bool ggml_cuda_op_regular_hadamard(ggml_backend_cuda_context & ctx, const ggml_tensor * src, ggml_tensor * dst, int group_size);
 diff -ruN --no-dereference a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cuda.cu
---- a/src/ggml-cuda/ggml-cuda.cu	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cuda/ggml-cuda.cu	2026-09-15 02:19:30.949782230 +0200
+--- a/src/ggml-cuda/ggml-cuda.cu	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cuda/ggml-cuda.cu	2026-09-24 15:01:26.996596678 +0200
 @@ -26,6 +26,7 @@
  #include "ggml-cuda/diag.cuh"
  #include "ggml-cuda/fattn.cuh"
@@ -642,7 +646,7 @@ diff -ruN --no-dereference a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cud
          case GGML_OP_MUL_MAT_ID:
              ggml_cuda_mul_mat_id(ctx, dst);
              break;
-@@ -5120,11 +5132,18 @@
+@@ -5188,11 +5200,18 @@
                      return false;
              }
              break;
@@ -663,7 +667,7 @@ diff -ruN --no-dereference a/src/ggml-cuda/ggml-cuda.cu b/src/ggml-cuda/ggml-cud
                  }
 diff -ruN --no-dereference a/src/ggml-cuda/i8-convrot.cu b/src/ggml-cuda/i8-convrot.cu
 --- a/src/ggml-cuda/i8-convrot.cu	1970-01-01 01:00:00.000000000 +0100
-+++ b/src/ggml-cuda/i8-convrot.cu	2026-09-15 02:19:30.949923632 +0200
++++ b/src/ggml-cuda/i8-convrot.cu	2026-09-24 15:01:26.996846301 +0200
 @@ -0,0 +1,443 @@
 +#include "i8-convrot.cuh"
 +
@@ -1110,7 +1114,7 @@ diff -ruN --no-dereference a/src/ggml-cuda/i8-convrot.cu b/src/ggml-cuda/i8-conv
 +}
 diff -ruN --no-dereference a/src/ggml-cuda/i8-convrot.cuh b/src/ggml-cuda/i8-convrot.cuh
 --- a/src/ggml-cuda/i8-convrot.cuh	1970-01-01 01:00:00.000000000 +0100
-+++ b/src/ggml-cuda/i8-convrot.cuh	2026-09-15 02:19:30.950030303 +0200
++++ b/src/ggml-cuda/i8-convrot.cuh	2026-09-24 15:01:26.996900772 +0200
 @@ -0,0 +1,19 @@
 +#pragma once
 +
@@ -1132,8 +1136,8 @@ diff -ruN --no-dereference a/src/ggml-cuda/i8-convrot.cuh b/src/ggml-cuda/i8-con
 +bool ggml_cuda_supports_quantize_i8_convrot(const ggml_tensor * op);
 +bool ggml_cuda_supports_regular_hadamard(const ggml_tensor * op);
 diff -ruN --no-dereference a/src/ggml-cuda/vendors/hip.h b/src/ggml-cuda/vendors/hip.h
---- a/src/ggml-cuda/vendors/hip.h	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-cuda/vendors/hip.h	2026-09-15 02:19:30.950061154 +0200
+--- a/src/ggml-cuda/vendors/hip.h	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-cuda/vendors/hip.h	2026-09-24 15:01:26.996931302 +0200
 @@ -20,6 +20,12 @@
  #define CUDA_R_16F  HIPBLAS_R_16F
  #define CUDA_R_16BF HIPBLAS_R_16B
@@ -1147,20 +1151,10 @@ diff -ruN --no-dereference a/src/ggml-cuda/vendors/hip.h b/src/ggml-cuda/vendors
  #define CUBLAS_SIDE_RIGHT HIPBLAS_SIDE_RIGHT
  #define CUBLAS_FILL_MODE_UPPER HIPBLAS_FILL_MODE_UPPER
  #define CUBLAS_DIAG_NON_UNIT HIPBLAS_DIAG_NON_UNIT
-diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/ggml-vulkan.cpp
---- a/src/ggml-vulkan/ggml-vulkan.cpp	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-vulkan/ggml-vulkan.cpp	2026-09-15 02:19:30.951357209 +0200
-@@ -976,6 +976,9 @@
- 
-     vk_pipeline pipeline_matmul_split_k_reduce;
-     vk_pipeline pipeline_quantize_q8_1_x4;
-+    vk_pipeline pipeline_quantize_i8_convrot;
-+    vk_pipeline pipeline_mul_mat_i8_tensorwise;
-+    vk_pipeline pipeline_mul_mat_i8_tensorwise_cm1;
- 
-     vk_pipeline pipeline_dequant[GGML_TYPE_COUNT];
-     vk_pipeline pipeline_dequant_transpose[GGML_TYPE_COUNT]; // fused dequant+transpose for FA quant-KV
-@@ -2175,6 +2178,19 @@
+diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan-push-constants.h b/src/ggml-vulkan/ggml-vulkan-push-constants.h
+--- a/src/ggml-vulkan/ggml-vulkan-push-constants.h	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-vulkan/ggml-vulkan-push-constants.h	2026-09-24 15:03:01.301341140 +0200
+@@ -850,6 +850,19 @@
      uint32_t num_blocks;
  };
  
@@ -1180,7 +1174,23 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
  struct vk_op_flash_attn_split_k_reduce_push_constants {
      uint32_t D;
      uint32_t ne1;
-@@ -5789,6 +5805,18 @@
+diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan-types.h b/src/ggml-vulkan/ggml-vulkan-types.h
+--- a/src/ggml-vulkan/ggml-vulkan-types.h	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-vulkan/ggml-vulkan-types.h	2026-09-24 15:03:01.301267730 +0200
+@@ -794,6 +794,9 @@
+ 
+     vk_pipeline pipeline_matmul_split_k_reduce;
+     vk_pipeline pipeline_quantize_q8_1_x4;
++    vk_pipeline pipeline_quantize_i8_convrot;
++    vk_pipeline pipeline_mul_mat_i8_tensorwise;
++    vk_pipeline pipeline_mul_mat_i8_tensorwise_cm1;
+ 
+     vk_pipeline pipeline_dequant[GGML_TYPE_COUNT];
+     vk_pipeline pipeline_dequant_transpose[GGML_TYPE_COUNT]; // fused dequant+transpose for FA quant-KV
+diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/ggml-vulkan.cpp
+--- a/src/ggml-vulkan/ggml-vulkan.cpp	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-vulkan/ggml-vulkan.cpp	2026-09-24 15:03:01.302390534 +0200
+@@ -3047,6 +3047,18 @@
          ggml_vk_create_pipeline(device, device->pipeline_quantize_q8_1_x4, "quantize_q8_1_x4", quantize_q8_1_x4_len, quantize_q8_1_x4_data, "main", 2, sizeof(vk_quantize_q8_1_push_constants), {32 * device->subgroup_size / 8, 1, 1}, { device->subgroup_size }, 1);
      }
  
@@ -1199,11 +1209,10 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
      for (uint32_t i = 0; i < p021_max_gqa_ratio; ++i) {
          if (device->subgroup_arithmetic && device->subgroup_require_full_support) {
              ggml_vk_create_pipeline2(device, device->pipeline_mul_mat_vec_p021_f16_f32[i], "mul_mat_vec_p021_f16_f32"+std::to_string(i+1), mul_mat_vec_p021_f16_f32_subgroup_add_len, mul_mat_vec_p021_f16_f32_subgroup_add_data, "main", mul_mat_vec_num_bindings, sizeof(vk_mat_vec_p021_push_constants), {1, 1, 1}, {device->subgroup_size, i + 1}, 1, true, true);
-@@ -10380,6 +10408,155 @@
+@@ -6987,6 +6999,154 @@
      ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { x_buf, r_buf, p_buf, c_buf, d_buf }, pc, { n_embd, n_tokens, 1 });
  }
  
-+
 +static bool ggml_vk_can_use_quantize_i8_convrot(const vk_device & device, const ggml_tensor * dst) {
 +#if defined(GGML_VULKAN_INTEGER_DOT_GLSLC_SUPPORT)
 +    const ggml_tensor * src = dst->src[0];
@@ -1352,10 +1361,10 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
 +    dispatch(ctx->device->pipeline_mul_mat_i8_tensorwise, coop_rows, rows - coop_rows);
 +}
 +
- static void ggml_vk_mul_mat(ggml_backend_vk_context * ctx, vk_context& subctx, const struct ggml_cgraph * cgraph, int node_idx) {
+ void ggml_vk_mul_mat(ggml_backend_vk_context * ctx, vk_context& subctx, const struct ggml_cgraph * cgraph, int node_idx) {
      ggml_tensor * dst = cgraph->nodes[node_idx];
      ggml_tensor * src0 = dst->src[0];
-@@ -16463,8 +16640,16 @@
+@@ -12398,8 +12558,16 @@
          ggml_vk_leaky_relu(ctx, compute_ctx, src0, node);
  
          break;
@@ -1373,7 +1382,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
  
          break;
      case GGML_OP_MUL_MAT_ID:
-@@ -19216,10 +19401,16 @@
+@@ -15098,10 +15266,16 @@
                  default:
                      return false;
              }
@@ -1392,7 +1401,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/ggml-vulkan.cpp b/src/ggml-vulkan/g
                          // If there's not enough shared memory for row_ids and the result tile, fallback to CPU
 diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise.comp b/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise.comp
 --- a/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise.comp	1970-01-01 01:00:00.000000000 +0100
-+++ b/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise.comp	2026-09-15 02:19:30.952281950 +0200
++++ b/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise.comp	2026-09-24 15:01:26.999856232 +0200
 @@ -0,0 +1,62 @@
 +#version 450
 +
@@ -1458,7 +1467,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwis
 +}
 diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise_cm1.comp b/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise_cm1.comp
 --- a/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise_cm1.comp	1970-01-01 01:00:00.000000000 +0100
-+++ b/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise_cm1.comp	2026-09-15 02:19:30.952335181 +0200
++++ b/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwise_cm1.comp	2026-09-24 15:01:26.999912432 +0200
 @@ -0,0 +1,94 @@
 +#version 460
 +
@@ -1556,7 +1565,7 @@ diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/mul_mat_i8_tensorwis
 +}
 diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/quantize_i8_convrot.comp b/src/ggml-vulkan/vulkan-shaders/quantize_i8_convrot.comp
 --- a/src/ggml-vulkan/vulkan-shaders/quantize_i8_convrot.comp	1970-01-01 01:00:00.000000000 +0100
-+++ b/src/ggml-vulkan/vulkan-shaders/quantize_i8_convrot.comp	2026-09-15 02:19:30.952379621 +0200
++++ b/src/ggml-vulkan/vulkan-shaders/quantize_i8_convrot.comp	2026-09-24 15:01:26.999959123 +0200
 @@ -0,0 +1,102 @@
 +#version 450
 +
@@ -1661,9 +1670,9 @@ diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/quantize_i8_convrot.
 +    }
 +}
 diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp b/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp
---- a/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp	2026-09-15 02:19:30.952465072 +0200
-@@ -929,6 +929,14 @@
+--- a/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.cpp	2026-09-24 15:01:27.000028634 +0200
+@@ -935,6 +935,14 @@
      string_to_spv("quantize_q8_1_x4", "quantize_q8_1.comp", {{"QBLOCK_X4", "1"}});
      string_to_spv("quantize_q8_1_x4_subgroup", "quantize_q8_1.comp", {{"QBLOCK_X4", "1"}, {"USE_SUBGROUPS", "1"}});
  
@@ -1679,8 +1688,8 @@ diff -ruN --no-dereference a/src/ggml-vulkan/vulkan-shaders/vulkan-shaders-gen.c
  
      string_to_spv("div_f32", "div.comp", {{"A_TYPE", "float"}, {"B_TYPE", "float"}, {"D_TYPE", "float"}, {"FLOAT_TYPE", "float"}});
 diff -ruN --no-dereference a/src/ggml.c b/src/ggml.c
---- a/src/ggml.c	2026-09-14 15:34:19.000000000 +0200
-+++ b/src/ggml.c	2026-09-15 02:19:30.952751126 +0200
+--- a/src/ggml.c	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml.c	2026-09-24 15:01:27.000295868 +0200
 @@ -1099,9 +1099,12 @@
      "OPT_STEP_SGD",
  
@@ -1807,11 +1816,11 @@ diff -ruN --no-dereference a/src/ggml.c b/src/ggml.c
  
  /*
 diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
---- a/tests/CMakeLists.txt	2026-09-15 02:19:16.624209271 +0200
-+++ b/tests/CMakeLists.txt	2026-09-15 02:19:30.953029489 +0200
-@@ -185,6 +185,16 @@
- add_test(NAME ${TEST_TARGET} COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+--- a/tests/CMakeLists.txt	2026-09-23 19:10:09.000000000 +0200
++++ b/tests/CMakeLists.txt	2026-09-24 15:01:27.000496060 +0200
+@@ -169,6 +169,16 @@
  set_property(TEST ${TEST_TARGET} PROPERTY ENVIRONMENT "LLVM_PROFILE_FILE=${TEST_TARGET}.profraw")
+ 
  
 +#
 +# test-int8-convrot (CPU / optional --vulkan|--cuda)
@@ -1828,7 +1837,7 @@ diff -ruN --no-dereference a/tests/CMakeLists.txt b/tests/CMakeLists.txt
      # test-opt
 diff -ruN --no-dereference a/tests/test-int8-convrot.cpp b/tests/test-int8-convrot.cpp
 --- a/tests/test-int8-convrot.cpp	1970-01-01 01:00:00.000000000 +0100
-+++ b/tests/test-int8-convrot.cpp	2026-09-15 02:19:30.953085920 +0200
++++ b/tests/test-int8-convrot.cpp	2026-09-24 15:01:27.000525751 +0200
 @@ -0,0 +1,312 @@
 +#include "ggml-backend.h"
 +#include "ggml.h"

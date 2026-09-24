@@ -13,7 +13,7 @@
 
 Summary:		Tensor library for machine learning
 Name:			ggml
-Version:		0.24.0
+Version:		0.25.1
 Release:		1
 License:		MIT
 Group:			System/Libraries
@@ -128,6 +128,8 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 #      the extra ops. Must not revert 0002's get_proc_address quantize
 #      exports (ABF 649598–600 %pgo: "CPU backend does not export
 #      quantize API").
+#      0.25.1 moved Vulkan pipeline fields and push constants into
+#      ggml-vulkan-types.h and ggml-vulkan-push-constants.h.
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
 0001-llvm23-bf16-wmma-short-vectors.patch
