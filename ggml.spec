@@ -128,6 +128,11 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 #      the extra ops. Must not revert 0002's get_proc_address quantize
 #      exports (ABF 649598–600 %pgo: "CPU backend does not export
 #      quantize API").
+#      The tests/CMakeLists.txt hunk has to apply after 0002, which
+#      inserts test-quantize-* before if(NOT GGML_BACKEND_DL). Anchor
+#      it on test-quantize-perf (diff -u's 3-line context). A longer
+#      prelude that repeats set(TEST_TARGET test-quantize-*) is rejected
+#      by patch 2.8 even when the bytes match.
 #      0.25.1 moved Vulkan pipeline fields and push constants into
 #      ggml-vulkan-types.h and ggml-vulkan-push-constants.h.
 # Keep after all preamble tags: %patchlist is a section-like directive.
