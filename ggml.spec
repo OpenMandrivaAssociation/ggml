@@ -14,7 +14,7 @@
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.25.1
-Release:		1
+Release:		2
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -150,6 +150,7 @@ and multi-ISA CPU backends. Optional accelerators are separate packages:
 * %{name}-backend-vulkan — Vulkan
 * %{name}-backend-opencl — OpenCL
 * %{name}-backend-hip — AMD ROCm/HIP (any host CPU with an AMD GPU)
+* ggml-backend-sycl — Intel GPU via DPC++ / Level Zero (x86_64)
 
 Used system-wide by llama-cpp, whisper-cpp, stable-diffusion.cpp
 and other consumers via find_package(ggml) / *_USE_SYSTEM_GGML.
@@ -173,6 +174,9 @@ Recommends:	%{name}-backend-vulkan%{?_isa} = %{EVRD}
 Suggests:	%{name}-backend-opencl%{?_isa} = %{EVRD}
 %if %{with rocm}
 Suggests:	%{name}-backend-hip%{?_isa} = %{EVRD}
+%endif
+%ifarch x86_64 znver1
+Suggests:	ggml-backend-sycl%{?_isa} >= %{version}
 %endif
 
 %description -n %{libname}
