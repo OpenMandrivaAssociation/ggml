@@ -150,7 +150,7 @@ and multi-ISA CPU backends. Optional accelerators are separate packages:
 * %{name}-backend-vulkan — Vulkan
 * %{name}-backend-opencl — OpenCL
 * %{name}-backend-hip — AMD ROCm/HIP (any host CPU with an AMD GPU)
-* ggml-backend-sycl — Intel GPU via DPC++ / Level Zero (x86_64)
+* ggml-backend-sycl — Intel GPU via DPC++ / Level Zero
 
 Used system-wide by llama-cpp, whisper-cpp, stable-diffusion.cpp
 and other consumers via find_package(ggml) / *_USE_SYSTEM_GGML.
@@ -175,7 +175,7 @@ Suggests:	%{name}-backend-opencl%{?_isa} = %{EVRD}
 %if %{with rocm}
 Suggests:	%{name}-backend-hip%{?_isa} = %{EVRD}
 %endif
-%ifarch x86_64 znver1
+%ifarch x86_64 znver1 aarch64
 Suggests:	ggml-backend-sycl%{?_isa} >= %{version}
 %endif
 
