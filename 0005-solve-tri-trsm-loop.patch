@@ -1,0 +1,32 @@
+--- a/src/ggml-sycl/solve_tri.cpp	2026-09-23 19:10:09.000000000 +0200
++++ b/src/ggml-sycl/solve_tri.cpp	2026-10-04 06:20:09.679767057 +0200
+@@ -99,16 +99,19 @@
+     const int64_t stride_a = nb02 / sizeof(float);
+     const int64_t stride_x = nb2 / sizeof(float);
+ 
+-    oneapi::mkl::blas::trsm_batch(
+-        *stream,
+-        oneapi::mkl::side::right,
+-        oneapi::mkl::uplo::upper,
+-        oneapi::mkl::transpose::nontrans,
+-        oneapi::mkl::diag::nonunit,
+-        k, n, alpha,
+-        A, n, stride_a,
+-        X, k, stride_x,
+-        total_batches);
++    // oneMath puts BLAS in column_major, and its generic backend implements
++    // trsm but not trsm_batch. One solve per batch is the same operation.
++    for (int64_t batch = 0; batch < total_batches; ++batch) {
++        oneapi::mkl::blas::column_major::trsm(
++            *stream,
++            oneapi::mkl::side::right,
++            oneapi::mkl::uplo::upper,
++            oneapi::mkl::transpose::nontrans,
++            oneapi::mkl::diag::nonunit,
++            k, n, alpha,
++            A + batch * stride_a, n,
++            X + batch * stride_x, k);
++    }
+ }
+ 
+ inline void ggml_sycl_op_solve_tri(ggml_backend_sycl_context & ctx, ggml_tensor * dst) {

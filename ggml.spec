@@ -8,13 +8,23 @@
 # truly lacks the stack.
 %bcond_without rocm
 
+# Intel SYCL/Level Zero plugin. Built from this source package so it
+# cannot drift from ggml. icpx cannot share a compiler with the HIP/PGO
+# build, so it is a second cmake (see %%install). intel-llvm is packaged
+# for these arches; --without sycl if a builder lacks the stack.
+%ifarch x86_64 znver1 aarch64
+%bcond_without sycl
+%else
+%bcond_with sycl
+%endif
+
 %define libname %{mklibname ggml}
 %define devname %{mklibname -d ggml}
 
 Summary:		Tensor library for machine learning
 Name:			ggml
 Version:		0.26.0
-Release:		1
+Release:		2
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -50,6 +60,14 @@ BuildRequires:	rocblas-devel
 BuildRequires:	hipblas-devel
 BuildRequires:	hipsolver-devel
 BuildRequires:	clang >= %{rocm_llvm_maj_ver}
+%endif
+%if %{with sycl}
+# Host C files use system clang. icpx is the C++/device compiler.
+BuildRequires:	clang
+BuildRequires:	intel-llvm
+BuildRequires:	onemath-devel
+BuildRequires:	onednn-devel
+BuildRequires:	pkgconfig(level-zero) >= 1.32.0
 %endif
 
 # ggml-config.cmake lists optional backends (CUDA, DNNL, …) as hard deps — drop them
@@ -135,12 +153,20 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 #      by patch 2.8 even when the bytes match.
 #      0.25.1 moved Vulkan pipeline fields and push constants into
 #      ggml-vulkan-types.h and ggml-vulkan-push-constants.h.
+# 0005: oneMath's generic BLAS implements trsm but not trsm_batch.
+#      solve_tri loops column_major::trsm. SYCL only.
+# 0006: icpx's spir64 device pass keeps the host __ARM_NEON / SVE macros.
+#      Including arm_neon.h there never returns from Itanium mangling.
+#      Host compiles do not define __SYCL_DEVICE_ONLY__, so CPU/HIP
+#      still include the headers.
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
 0001-llvm23-bf16-wmma-short-vectors.patch
 0002-backend-dl-quantize-tests.patch
 0003-test-backend-ops-case-counter.patch
 0004-max-name-160-and-i8-convrot.patch
+0005-solve-tri-trsm-loop.patch
+0006-sycl-device-skip-arm-neon.patch
 
 %description
 ggml is a tensor library for machine learning with integer quantization
@@ -150,7 +176,7 @@ and multi-ISA CPU backends. Optional accelerators are separate packages:
 * %{name}-backend-vulkan — Vulkan
 * %{name}-backend-opencl — OpenCL
 * %{name}-backend-hip — AMD ROCm/HIP (any host CPU with an AMD GPU)
-* ggml-backend-sycl — Intel GPU via DPC++ / Level Zero
+* %{name}-backend-sycl — Intel GPU via DPC++ / Level Zero
 
 Used system-wide by llama-cpp, whisper-cpp, stable-diffusion.cpp
 and other consumers via find_package(ggml) / *_USE_SYSTEM_GGML.
@@ -175,8 +201,8 @@ Suggests:	%{name}-backend-opencl%{?_isa} = %{EVRD}
 %if %{with rocm}
 Suggests:	%{name}-backend-hip%{?_isa} = %{EVRD}
 %endif
-%ifarch x86_64 znver1 aarch64
-Suggests:	ggml-backend-sycl%{?_isa} >= %{version}
+%if %{with sycl}
+Suggests:	%{name}-backend-sycl%{?_isa} = %{EVRD}
 %endif
 
 %description -n %{libname}
@@ -226,6 +252,17 @@ Requires:	%{libname}%{?_isa} = %{EVRD}
 
 %description backend-hip
 ggml backend plugin for AMD GPUs via ROCm/HIP (multi-arch fat binary).
+%endif
+
+%if %{with sycl}
+%package backend-sycl
+Summary:	Intel GPU SYCL backend plugin for %{name}
+Group:		System/Libraries
+Requires:	%{libname}%{?_isa} = %{EVRD}
+
+%description backend-sycl
+ggml backend plugin for Intel GPUs. Built with the DPC++ compiler
+(icpx), Level Zero, oneMath's generic SYCL BLAS and oneDNN.
 %endif
 
 # Prefer clang; for HIP, strip host-only -m* flags that break device compiles.
@@ -391,12 +428,85 @@ mkdir -p %{buildroot}%{backend_dir}
 rm -f %{buildroot}%{backend_dir}/libggml-base.so* \
 	%{buildroot}%{backend_dir}/libggml.so* 2>/dev/null || true
 
+%if %{with sycl}
+# SYCL is not a BuildOption on the PGO/HIP build: icpx cannot share that
+# compiler, and %%build runs twice (instrumented, then optimized). %%install
+# runs once after the profile-use pass, with the PGO flags already popped.
+# Do not move this into %%build.
+#
+# Host -march and -flto break spir64 device compilation. icpx does not
+# search /usr/include, and its SYCL headers include CL/cl.h. A link of
+# only .o files does not pull in libstdc++.
+_top=$PWD
+_flags=$(printf '%s' "%{optflags}" | sed -E 's/-flto//g; s/-g3//g; s/-gdwarf-4//g; s/-mfpmath=[^ ]+//g; s/ -m[a-z0-9+.=]+//g')
+_flags="$_flags -g0 -I%{_includedir}"
+_ldflags=$(printf '%s' "%{build_ldflags}" | sed -E 's/-flto//g; s/-mfpmath=[^ ]+//g; s/ -m[a-z0-9+.=]+//g')
+export CFLAGS="$_flags"
+export CXXFLAGS="$_flags"
+export LDFLAGS="$_ldflags"
+export CC=clang
+mkdir -p %{_builddir}/bin
+cat > %{_builddir}/bin/icpx << EOF
+#!/bin/sh
+link=1
+for arg in "\$@"; do
+	case "\$arg" in
+	-c|-E|-S|-fsyntax-only) link=0 ;;
+	esac
+done
+if [ "\$link" = 1 ]; then
+	exec %{_libdir}/intel-llvm/bin/icpx "\$@" -lstdc++
+else
+	exec %{_libdir}/intel-llvm/bin/icpx "\$@"
+fi
+EOF
+chmod 755 %{_builddir}/bin/icpx
+export CXX="%{_builddir}/bin/icpx"
+export CMAKE_GENERATOR=Ninja
+export CMAKE_BUILD_DIR=_OMV_sycl_build
+# CPU, Vulkan, OpenCL, BLAS and HIP are already produced by the main
+# build. This tree only exists to install libggml-sycl.so.
+%cmake \
+	-DGGML_NATIVE:BOOL=OFF \
+	-DGGML_LTO:BOOL=OFF \
+	-DGGML_OPENMP:BOOL=OFF \
+	-DGGML_BACKEND_DL:BOOL=ON \
+	-DGGML_BACKEND_DIR=%{backend_dir} \
+	-DGGML_CPU:BOOL=OFF \
+	-DGGML_CPU_ALL_VARIANTS:BOOL=OFF \
+	-DGGML_AVX:BOOL=OFF \
+	-DGGML_AVX2:BOOL=OFF \
+	-DGGML_AVX512:BOOL=OFF \
+	-DGGML_VULKAN:BOOL=OFF \
+	-DGGML_OPENCL:BOOL=OFF \
+	-DGGML_BLAS:BOOL=OFF \
+	-DGGML_HIP:BOOL=OFF \
+	-DGGML_CUDA:BOOL=OFF \
+	-DGGML_METAL:BOOL=OFF \
+	-DGGML_RPC:BOOL=OFF \
+	-DGGML_BUILD_TESTS:BOOL=OFF \
+	-DGGML_BUILD_EXAMPLES:BOOL=OFF \
+	-DGGML_SYCL:BOOL=ON \
+	-DGGML_SYCL_TARGET=INTEL \
+	-DGGML_SYCL_F16:BOOL=ON \
+	-DGGML_SYCL_DNN:BOOL=ON \
+	-DGGML_SYCL_SUPPORT_LEVEL_ZERO_API:BOOL=ON \
+	-DCMAKE_SKIP_RPATH:BOOL=OFF \
+	-DCMAKE_INSTALL_RPATH=%{_libdir}/intel-llvm/lib \
+	-DCMAKE_MODULE_LINKER_FLAGS="$(printf '%%s' "$LDFLAGS" | sed -e 's#-Wl,--no-undefined##')"
+ninja -v
+test -f bin/libggml-sycl.so
+install -pm 755 bin/libggml-sycl.so %{buildroot}%{backend_dir}/libggml-sycl.so
+cd "$_top"
+unset CMAKE_BUILD_DIR
+%endif
+
 %files -n %{libname}
 %license LICENSE
 %{_libdir}/libggml.so.*
 %{_libdir}/libggml-base.so.*
 %dir %{backend_dir}
-# CPU ISA variants only — no ROCm/Vulkan/OpenCL/BLAS hard deps
+# CPU ISA variants only — no ROCm/Vulkan/OpenCL/BLAS/SYCL hard deps
 %{backend_dir}/libggml-cpu-*.so
 
 %files -n %{devname}
@@ -421,4 +531,9 @@ rm -f %{buildroot}%{backend_dir}/libggml-base.so* \
 %if %{with rocm}
 %files backend-hip
 %{backend_dir}/libggml-hip.so
+%endif
+
+%if %{with sycl}
+%files backend-sycl
+%{backend_dir}/libggml-sycl.so
 %endif
