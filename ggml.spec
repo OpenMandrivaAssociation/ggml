@@ -134,12 +134,11 @@ BuildOption:	-DCMAKE_CXX_COMPILER=clang++
 BuildOption:	-DGGML_HIP:BOOL=OFF
 %endif
 
-# 0001 dropped: 0.28 RDNA3/RDNA4 WMMA bf16 builtins already take short
-#      vectors (same change the old patch made). MFMA on CDNA still
-#      uses __bf16, which the old patch never touched.
-# 0001: LLVM 23 CDNA1 (gfx908) mfma_f32_16x16x8bf16 takes a short vector.
-#      0.28 already uses short for RDNA3/RDNA4 WMMA. CDNA2+ 16bf16_1k
-#      still matches __bf16 (ABF 684110 compiled those arches).
+# 0001: LLVM 23 CDNA MFMA bf16 builtins take short vectors, not __bf16.
+#      gfx908 mfma_f32_16x16x8bf16 is E2s; gfx90a+ mfma_f32_16x16x16bf16_1k
+#      is E4s. 0.28 already uses short for RDNA3/RDNA4 WMMA. ABF
+#      684110/684111 died on gfx908; the x4 operand would fail next.
+
 # 0002: test-quantize-{perf,fns} with GGML_BACKEND_DL via get_proc_address
 # 0003: [i/N] progress; apply -o before counting so N is cases that run
 # 0004: GGML_MAX_NAME 160 (sd.cpp Flux/SDXL tensor names) + ComfyUI
