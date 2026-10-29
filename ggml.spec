@@ -137,6 +137,9 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 # 0001 dropped: 0.28 RDNA3/RDNA4 WMMA bf16 builtins already take short
 #      vectors (same change the old patch made). MFMA on CDNA still
 #      uses __bf16, which the old patch never touched.
+# 0001: LLVM 23 CDNA1 (gfx908) mfma_f32_16x16x8bf16 takes a short vector.
+#      0.28 already uses short for RDNA3/RDNA4 WMMA. CDNA2+ 16bf16_1k
+#      still matches __bf16 (ABF 684110 compiled those arches).
 # 0002: test-quantize-{perf,fns} with GGML_BACKEND_DL via get_proc_address
 # 0003: [i/N] progress; apply -o before counting so N is cases that run
 # 0004: GGML_MAX_NAME 160 (sd.cpp Flux/SDXL tensor names) + ComfyUI
@@ -161,6 +164,7 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 #      still include the headers.
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
+0001-llvm23-cdna1-mfma-bf16-short.patch
 0002-backend-dl-quantize-tests.patch
 0003-test-backend-ops-case-counter.patch
 0004-max-name-160-and-i8-convrot.patch
