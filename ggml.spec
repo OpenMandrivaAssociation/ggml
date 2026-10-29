@@ -126,8 +126,15 @@ BuildOption:	-DGGML_HIP_RCCL:BOOL=OFF
 BuildOption:	-DGPU_TARGETS="%{rocm_gpu_targets}"
 BuildOption:	-DAMDGPU_TARGETS="%{rocm_gpu_targets}"
 BuildOption:	-DCMAKE_HIP_ARCHITECTURES="%{rocm_gpu_targets}"
-# Ensure device bitcode is found during enable_language(HIP) try-compile
+# Ensure device bitcode is found during enable_language(HIP) try-compile.
+# clang compiles every --offload-arch in one process. That SIGKILL'd
+# mmvq.cu on the 64G x86 builders (684130). One device arch at a time
+# keeps the full GPU target list. aarch64 already linked this HIP build.
+%ifnarch aarch64
+BuildOption:	-DCMAKE_HIP_FLAGS="--rocm-path=%{_prefix} --rocm-device-lib-path=%{_libdir}/amdgcn/bitcode --offload-jobs=1"
+%else
 BuildOption:	-DCMAKE_HIP_FLAGS="--rocm-path=%{_prefix} --rocm-device-lib-path=%{_libdir}/amdgcn/bitcode"
+%endif
 BuildOption:	-DCMAKE_PREFIX_PATH=%{_prefix}
 %else
 BuildOption:	-DCMAKE_CXX_COMPILER=clang++
@@ -336,6 +343,12 @@ if printf '%s' "${CFLAGS-}${CXXFLAGS-}${LDFLAGS-}" | grep -q 'fprofile-'; then
 	export FFLAGS="$(_strip_pgo "${FFLAGS-}")"
 	export FCFLAGS="$(_strip_pgo "${FCFLAGS-}")"
 fi
+%ifnarch aarch64
+# Device codegen is one arch at a time (--offload-jobs=1 above), but ninja
+# would still launch one clang per CPU. Six of those fit a 64G builder;
+# the full nproc set does not. aarch64 already linked this HIP build.
+export CMAKE_BUILD_PARALLEL_LEVEL=6
+%endif
 
 # Profile-guided optimization training (pass 1 instrumented binaries).
 # Offline synthetic workloads only — no models, no network.
