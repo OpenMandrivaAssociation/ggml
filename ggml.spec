@@ -23,8 +23,8 @@
 
 Summary:		Tensor library for machine learning
 Name:			ggml
-Version:		0.26.0
-Release:		2
+Version:		0.28.0
+Release:		1
 License:		MIT
 Group:			System/Libraries
 %{!?rocm_llvm_maj_ver:%global rocm_llvm_maj_ver 23}
@@ -107,10 +107,8 @@ BuildOption:	-DGGML_FMA:BOOL=OFF
 BuildOption:	-DGGML_F16C:BOOL=OFF
 BuildOption:	-DGGML_AVX512:BOOL=OFF
 %endif
-%ifarch %{aarch64}
-BuildOption:	-DGGML_CPU_AARCH64:BOOL=ON
-%else
-BuildOption:	-DGGML_CPU_AARCH64:BOOL=OFF
+# 0.28 removed GGML_CPU_AARCH64. ALL_VARIANTS still builds the ARM plugins.
+%ifnarch %{aarch64}
 BuildOption:	-DGGML_OPENCL_USE_ADRENO_KERNELS:BOOL=OFF
 %endif
 %if %{with rocm}
@@ -136,16 +134,18 @@ BuildOption:	-DCMAKE_CXX_COMPILER=clang++
 BuildOption:	-DGGML_HIP:BOOL=OFF
 %endif
 
-# 0001: LLVM 23 amdgcn bf16 WMMA/MFMA builtins take short vectors, not __bf16
+# 0001 dropped: 0.28 RDNA3/RDNA4 WMMA bf16 builtins already take short
+#      vectors (same change the old patch made). MFMA on CDNA still
+#      uses __bf16, which the old patch never touched.
 # 0002: test-quantize-{perf,fns} with GGML_BACKEND_DL via get_proc_address
 # 0003: [i/N] progress; apply -o before counting so N is cases that run
 # 0004: GGML_MAX_NAME 160 (sd.cpp Flux/SDXL tensor names) + ComfyUI
 #      int8_tensorwise/convrot ops. CPU + Vulkan native; HIP uses
 #      hipblasGemmEx I8→I32 with a naive kernel fallback (Vega etc.).
-#      RPC proto minor is upstream 1; bump patch + OP_COUNT 103 for
-#      the extra ops. Must not revert 0002's get_proc_address quantize
-#      exports (ABF 649598–600 %pgo: "CPU backend does not export
-#      quantize API").
+#      Upstream 0.28 is OP_COUNT 102 (TOP_K_MASK) and RPC 8.0.1.
+#      The two extra ops make OP_COUNT 104 and RPC patch 8.0.2.
+#      Must not revert 0002's get_proc_address quantize exports
+#      (ABF 649598–600 %pgo: "CPU backend does not export quantize API").
 #      The tests/CMakeLists.txt hunk has to apply after 0002, which
 #      inserts test-quantize-* before if(NOT GGML_BACKEND_DL). Anchor
 #      it on test-quantize-perf (diff -u's 3-line context). A longer
@@ -161,7 +161,6 @@ BuildOption:	-DGGML_HIP:BOOL=OFF
 #      still include the headers.
 # Keep after all preamble tags: %patchlist is a section-like directive.
 %patchlist
-0001-llvm23-bf16-wmma-short-vectors.patch
 0002-backend-dl-quantize-tests.patch
 0003-test-backend-ops-case-counter.patch
 0004-max-name-160-and-i8-convrot.patch
